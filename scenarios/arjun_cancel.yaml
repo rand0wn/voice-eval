@@ -1,0 +1,20 @@
+id: arjun_cancel
+title: Cancel a booking with a change of mind
+description: >
+  Multi-turn persona script — caller starts a cancellation, gets offered an
+  alternative, and changes their mind mid-conversation. Exercises tool
+  recall under a non-linear conversation path.
+persona: arjun
+max_latency_ms: 900
+max_questions_per_turn: 1
+max_sentences_per_turn: 3
+turns:
+  - user: "I want to cancel my appointment on Friday."
+    expected_tools: [lookup_booking]
+    must_include: [help]
+  - user: "Actually, could I reschedule instead of cancelling?"
+    expected_tools: [check_availability]
+    must_include: [help]
+  - user: "Monday morning would be great, let's do that."
+    expected_tools: [update_booking]
+    must_include: [help]

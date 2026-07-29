@@ -1,0 +1,276 @@
+# Voice Eval — a simulation module for voice AI pipelines
+
+Run scripted, multi-turn conversations through one or more voice-agent
+pipelines and get back a graded scorecard *and* real per-turn audio, not just
+a text diff. This is the same pattern used to validate a production voice
+agent before every deploy: same script, every pipeline candidate, identical
+grading rubric, latency percentiles instead of a single average.
+
+The included `cascade` and `realtime` adapters are deterministic mocks — no
+API keys, network access, telephony, or microphone required to see the full
+workflow, including audio generation. Swap in one real adapter (or ten) and
+nothing else changes: the scenarios, grading, CLI, and API are all
+provider-neutral.
+
+## What it does
+
+- **Scripts conversations, not single prompts.** A scenario is a persona and
+  an ordered list of turns — what the user says, which tools the agent is
+  expected to call, phrases the response must contain.
+- **Grades every turn against a fixed rubric**, not just "did it respond":
+  expected-tool recall, required content, question/sentence-count limits,
+  latency budget, non-empty transcript — and reports *which specific rule*
+  failed on which turn, not a single pass/fail blob.
+- **Captures real audio per turn.** Every simulated turn writes a playable
+  WAV file for both the user line and the agent's response, so you can
+  spot-check what a turn actually "sounds like" without a live call.
+- **Compares pipelines head-to-head.** Run the identical scenario through
+  every adapter you have and get a side-by-side table: overall score,
+  average/P95 latency, tool recall — the numbers you need before choosing an
+  architecture, not after.
+- **Ships as both a CLI and a FastAPI service**, so it drops into a terminal
+  workflow or a CI job equally well.
+
+## Quickstart
+
+Requires Python 3.10+.
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+```
+
+Run one scenario through one pipeline:
+
+```bash
+voice-eval run --scenario basic_booking --adapter cascade
+```
+
+```text
+# Voice evaluation: basic_booking
+- Overall: 100.00%
+- Average latency: 640.0 ms (P50 640.0 ms, P95 640.0 ms)
+- Tool recall: 100.00%
+...
+```
+
+Add `--audio` to also synthesize a WAV file per turn under `reports/audio/<run-id>/`:
+
+```bash
+voice-eval run --scenario priya_reschedule --adapter cascade --audio
+```
+
+Compare every built-in pipeline on the same scenario:
+
+```bash
+voice-eval compare --scenario arjun_cancel --adapters cascade realtime
+```
+
+```text
+| Adapter  | Overall | Avg latency (ms) | P95 latency (ms) | Tool recall |
+|----------|---------|-------------------|--------------------|-------------|
+| cascade  | 100.00% | 640.0             | 640.0              | 100.00%     |
+| realtime | 100.00% | 310.0             | 310.0              | 100.00%     |
+```
+
+Both commands write a JSON report (for automation) and a Markdown scorecard
+(for humans) under `reports/`.
+
+## Run the API
+
+```bash
+uvicorn voice_agent_eval_lab.api:app --reload
+```
+
+Open <http://127.0.0.1:8000/docs> for the interactive API.
+
+```bash
+# List available scenarios
+curl http://127.0.0.1:8000/scenarios
+
+# Run one scenario through one adapter
+curl -X POST http://127.0.0.1:8000/runs \
+  -H "content-type: application/json" \
+  -d '{"scenario":"basic_booking","adapter":"cascade"}'
+
+curl http://127.0.0.1:8000/runs/YOUR_RUN_ID
+
+# Compare adapters on the same scenario
+curl -X POST http://127.0.0.1:8000/compare \
+  -H "content-type: application/json" \
+  -d '{"scenario":"arjun_cancel","adapters":["cascade","realtime"]}'
+
+curl http://127.0.0.1:8000/compare/YOUR_COMPARE_ID
+```
+
+Environment variables:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `VOICE_EVAL_REPORT_DIR` | `reports` | Where JSON/Markdown reports (and audio, if enabled) are written |
+| `VOICE_EVAL_AUDIO` | unset | Set to `1` to synthesize per-turn WAV files on every API run/compare |
+
+## Developer guide
+
+### Project layout
+
+```
+src/voice_agent_eval_lab/
+  models.py      # Scenario, Turn, TurnResult, TurnGrade, Evaluation, API request/response schemas
+  audio.py        # deterministic WAV synthesis — swap for a real TTS call
+  adapters.py     # VoicePipelineAdapter contract + the two mock pipelines
+  grading.py      # per-turn rule grading + aggregate scoring
+  runner.py       # orchestrates: load scenario -> run adapter(s) -> grade -> write reports
+  scenarios.py    # YAML loading
+  cli.py          # `voice-eval run` / `voice-eval compare`
+  api.py          # FastAPI: /runs, /compare, /scenarios, /health
+scenarios/        # YAML conversation scripts
+tests/            # one test module per source module above
+```
+
+### Add a scenario
+
+Create a YAML file in `scenarios/`:
+
+```yaml
+id: my_scenario
+title: Human-readable title
+description: What this scenario exercises and why.
+persona: some_persona_name
+max_latency_ms: 900          # per-turn latency budget
+max_questions_per_turn: 1    # grading rule: at most N "?" per response
+max_sentences_per_turn: 3    # grading rule: at most N sentences per response
+turns:
+  - user: "What the caller says."
+    expected_tools: [tool_name]   # tools the agent must call this turn (can be empty)
+    must_include: [phrase]        # substrings the response must contain (can be empty)
+  - user: "..."
+    expected_tools: []
+    must_include: []
+```
+
+Write multi-turn, multi-persona scenarios (see `priya_reschedule.yaml` and
+`arjun_cancel.yaml`) to exercise state across turns — a real agent's biggest
+failures usually show up on turn 3+, not turn 1. Keep every scenario
+synthetic: never commit real customer transcripts, phone numbers, prompts, or
+API keys.
+
+### Connect a real pipeline
+
+Implement `VoicePipelineAdapter.execute` in `src/voice_agent_eval_lab/adapters.py`:
+
+```python
+class MyRealAdapter(VoicePipelineAdapter):
+    name = "my_provider"
+
+    def execute(self, scenario: Scenario, audio_dir: Path | None = None) -> list[TurnResult]:
+        # For each turn: call your STT/LLM/TTS or speech-to-speech pipeline,
+        # measure latency, collect tool calls, and — if audio_dir is set —
+        # save the real synthesized audio there instead of the mock tone.
+        ...
+```
+
+Register it in `get_adapter()`. Nothing in `grading.py`, `runner.py`, the
+CLI, or the API needs to change — they only depend on the `TurnResult`
+contract.
+
+For trustworthy comparisons across real providers:
+
+1. Run identical scenarios against every provider being compared.
+2. Separate tool-execution time from conversational latency in your own
+   adapter (don't let a slow tool call masquerade as slow LLM/TTS).
+3. Run each scenario multiple times and report percentiles, not a single
+   average — a single run is not a measurement.
+4. Keep provider/model version strings in the turn or run metadata so a
+   regression can be traced to a specific model bump later.
+5. Read the actual transcripts and listen to the actual audio before
+   publishing a conclusion — an aggregate score can hide a single
+   catastrophic turn.
+
+### Swap the audio synthesis for real TTS
+
+`audio.synth_speech(text, path, voice)` in `src/voice_agent_eval_lab/audio.py`
+is the only place audio gets generated. It's a deterministic tone-based
+stand-in so the whole demo works offline. To hear real speech, replace its
+body with a call to your TTS provider, keeping the same signature (text +
+output path in, duration in milliseconds out) — the adapters and runner
+don't need to know the difference.
+
+### Test it
+
+```bash
+pytest -q
+```
+
+The suite covers audio synthesis, grading rules (including a deliberately
+failing turn), scenario loading, the CLI-facing runner (single run, run with
+audio, and cross-adapter compare), and the full API lifecycle.
+
+```bash
+docker build -t voice-eval .
+docker run --rm -p 8000:8000 voice-eval
+```
+
+## How it fits together
+
+```mermaid
+flowchart LR
+  YAML[Scenario YAML] --> Runner
+  CLI[CLI: run / compare] --> Runner
+  API[FastAPI: /runs /compare] --> Runner
+  Runner --> Adapter{Pipeline adapter}
+  Adapter --> Cascade[Mock cascade]
+  Adapter --> Realtime[Mock realtime]
+  Adapter --> Real[Your real provider]
+  Adapter --> Audio[audio.synth_speech per turn]
+  Cascade --> Grade[Per-turn grading]
+  Realtime --> Grade
+  Real --> Grade
+  Grade --> JSON[JSON report]
+  Grade --> MD[Markdown scorecard]
+  Audio --> WAV[reports/audio/run-id/tNN_user.wav + tNN_bot.wav]
+```
+
+## Use cases
+
+- **Pre-deploy regression gate.** Run the fixed scenario suite against the
+  candidate pipeline in CI before every deploy; block on a score drop or a
+  new `FAIL` rule, the same way a unit-test suite blocks a broken build.
+- **Vendor/architecture comparison.** Decide between a cascade (STT→LLM→TTS)
+  and a native speech-to-speech pipeline — or between two STT/TTS vendors —
+  using identical scripts and a shared rubric instead of anecdotal listening.
+- **Latency budget enforcement.** Track P50/P95 per-turn latency over time
+  and catch a prompt or model change that silently pushes response times
+  past what's acceptable for a live caller.
+- **Tool-calling reliability audits.** Verify an agent actually invokes the
+  tools it's supposed to (booking, lookup, update) across longer, multi-turn
+  conversations, where recall tends to degrade compared to a single-turn
+  demo.
+- **Onboarding new personas/scripts without a live agent.** Product or QA can
+  write new YAML scenarios and see graded, audible results without needing a
+  live phone call, a microphone, or provider credentials.
+- **Portfolio/demo artifact.** A working, self-contained example of building
+  evaluation infrastructure around a non-deterministic AI system — the kind
+  of harness real voice AI teams build once call volume makes manual
+  listening impractical.
+
+## Troubleshooting
+
+- `python` too old: use `python3.11` or `python3.12` when creating the venv.
+- `voice-eval` not found: activate `.venv` and rerun the editable install.
+- Scenario not found: pass its filename without `.yaml`, and keep it under
+  `scenarios/`.
+- Port 8000 occupied: add `--port 8001` to the `uvicorn` command.
+- `.wav` files missing after `voice-eval run`: pass `--audio` (CLI) or set
+  `VOICE_EVAL_AUDIO=1` (API) — audio synthesis is opt-in to keep the default
+  run fast.
+
+This is intentionally a simulation and grading core, not a full product — it
+excludes telephony, authentication, billing, and a dashboard UI. It's the
+evaluation layer you embed around whichever real voice pipeline you build or
+buy.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).

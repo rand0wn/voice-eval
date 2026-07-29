@@ -1,0 +1,23 @@
+id: priya_reschedule
+title: Reschedule an existing booking
+description: >
+  Multi-turn persona script — caller wants to move an existing appointment,
+  then asks a follow-up question, then confirms. Exercises tool recall across
+  more than one turn and a longer conversation than the smoke-test scenario.
+persona: priya
+max_latency_ms: 900
+max_questions_per_turn: 1
+max_sentences_per_turn: 3
+turns:
+  - user: "Hi, I need to move my Thursday appointment to next week."
+    expected_tools: [lookup_booking]
+    must_include: [help]
+  - user: "Anytime Monday or Tuesday afternoon works for me."
+    expected_tools: [check_availability]
+    must_include: [help]
+  - user: "Tuesday at 3pm sounds good, please confirm."
+    expected_tools: [update_booking]
+    must_include: [help]
+  - user: "Great, thank you! That's all I needed."
+    expected_tools: []
+    must_include: [help]
