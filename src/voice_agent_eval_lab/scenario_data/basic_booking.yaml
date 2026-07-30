@@ -1,0 +1,14 @@
+id: basic_booking
+title: Basic appointment booking
+description: Synthetic, domain-neutral tool-use scenario.
+persona: default
+max_latency_ms: 800
+max_questions_per_turn: 1
+max_sentences_per_turn: 3
+turns:
+  - user: "Please book a consultation for Tuesday."
+    expected_tools: [check_availability]
+    must_include: [help]
+  - user: "The afternoon works. Confirm it."
+    expected_tools: [create_booking]
+    must_include: [help]
