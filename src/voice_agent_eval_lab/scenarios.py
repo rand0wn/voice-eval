@@ -11,11 +11,10 @@ from .models import Scenario
 def default_scenario_dir() -> Path:
     """Resolve the scenario directory.
 
-    Honors `VOICE_EVAL_SCENARIO_DIR` first (set this in installed/packaged
-    deployments, e.g. Docker, where the package no longer sits next to a
-    source checkout's `scenarios/` folder). Falls back to the repo-relative
-    path for editable installs, then to `./scenarios` under the current
-    working directory.
+    Honors `VOICE_EVAL_SCENARIO_DIR` first. Falls back to the repository
+    scenario directory for editable installs, then to scenarios bundled
+    inside the installed package. The final current-working-directory
+    fallback remains useful for ad-hoc source deployments.
     """
     env_dir = os.getenv("VOICE_EVAL_SCENARIO_DIR")
     if env_dir:
@@ -24,6 +23,10 @@ def default_scenario_dir() -> Path:
     repo_relative = Path(__file__).resolve().parents[2] / "scenarios"
     if repo_relative.is_dir():
         return repo_relative
+
+    packaged = Path(__file__).resolve().parent / "scenario_data"
+    if packaged.is_dir():
+        return packaged
 
     return Path.cwd() / "scenarios"
 

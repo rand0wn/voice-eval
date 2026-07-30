@@ -19,6 +19,9 @@ voice-eval = "voice_agent_eval_lab.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+voice_agent_eval_lab = ["scenario_data/*.yaml"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

@@ -1,12 +1,22 @@
 import json
 from pathlib import Path
 
+from voice_agent_eval_lab.scenarios import list_scenarios
 from voice_agent_eval_lab.runner import (
     compare_evaluation,
     run_evaluation,
     write_compare_reports,
     write_reports,
 )
+
+
+def test_builtin_scenarios_are_packaged():
+    packaged = Path(__file__).parents[1] / "src" / "voice_agent_eval_lab" / "scenario_data"
+    assert list_scenarios(packaged) == [
+        "arjun_cancel",
+        "basic_booking",
+        "priya_reschedule",
+    ]
 
 
 def test_run_and_reports(tmp_path):
