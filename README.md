@@ -16,6 +16,14 @@ microphone required to see the full workflow, including audio generation. Swap
 in one real adapter (or ten) and nothing else changes: the scenarios, grading,
 CLI, and API are all provider-neutral.
 
+> **Stop manually retesting your voice agent.**
+> [Run your first repeatable evaluation](#quickstart), then connect your own
+> pipeline and share what the scorecard catches.
+
+**Ready to help?** Try a scenario, [open an issue](https://github.com/rand0wn/voice-eval/issues)
+with your results, or read the [contribution guide](CONTRIBUTING.md) to add an
+adapter, scenario, grading rule, or documentation improvement.
+
 ## What it does
 
 - **Scripts conversations, not single prompts.** A scenario is a persona and
@@ -283,6 +291,19 @@ This is intentionally a simulation and grading core, not a full product — it
 excludes telephony, authentication, billing, and a dashboard UI. It's the
 evaluation layer you embed around whichever real voice pipeline you build or
 buy.
+
+## Contributing
+
+Contributions are welcome, including small documentation fixes. The most useful
+ways to help are:
+
+- add a synthetic multi-turn scenario that exposes a real failure mode;
+- connect another voice pipeline through a provider-neutral adapter;
+- improve grading, reports, or CI integration;
+- report a reproducible bug or share how the harness behaved on your pipeline.
+
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). It explains setup, tests, pull
+requests, privacy expectations, and good first contributions.
 
 ## License
 
