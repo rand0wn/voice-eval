@@ -1,4 +1,4 @@
-from voice_agent_eval_lab.adapters import MockCascadeAdapter
+from voice_agent_eval_lab.adapters import MockCascadeAdapter, MockDegradedAdapter
 from voice_agent_eval_lab.grading import evaluate
 from voice_agent_eval_lab.scenarios import load_scenario
 
@@ -30,3 +30,20 @@ def test_missing_tool_call_fails_that_turns_grade():
     evaluation = evaluate(scenario, results)
     assert "expected_tools_called" in evaluation.turn_grades[0].failed_rules
     assert evaluation.turn_grades[0].score < 1.0
+
+
+def test_degraded_adapter_exposes_multiple_failure_types():
+    scenario = load_scenario("arjun_cancel")
+    evaluation = evaluate(scenario, MockDegradedAdapter().execute(scenario))
+
+    assert 0.50 < evaluation.overall_score < 0.60
+    assert evaluation.tool_recall == 0.3333
+    assert evaluation.rubric_score == 0.3333
+    assert evaluation.details["p95_ms"] == 1450.0
+    assert {
+        "expected_tools_called",
+        "must_include_phrase",
+        "max_questions_per_turn",
+        "max_sentences_per_turn",
+        "latency_budget",
+    }.issubset(evaluation.turn_grades[0].failed_rules)

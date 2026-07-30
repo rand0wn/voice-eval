@@ -10,6 +10,8 @@ from .runner import (
     write_reports,
 )
 
+ADAPTER_CHOICES = ["cascade", "realtime", "degraded"]
+
 
 def _run(args: argparse.Namespace) -> None:
     audio_root = args.output / "audio" if args.audio else None
@@ -35,7 +37,7 @@ def main() -> None:
 
     run_parser = sub.add_parser("run", help="Run one scenario through one pipeline adapter")
     run_parser.add_argument("--scenario", default="basic_booking")
-    run_parser.add_argument("--adapter", choices=["cascade", "realtime"], default="cascade")
+    run_parser.add_argument("--adapter", choices=ADAPTER_CHOICES, default="cascade")
     run_parser.add_argument("--output", type=Path, default=Path("reports"))
     run_parser.add_argument(
         "--audio", action="store_true", help="Synthesize a WAV file per turn under reports/audio/"
@@ -47,7 +49,10 @@ def main() -> None:
     )
     compare_parser.add_argument("--scenario", default="basic_booking")
     compare_parser.add_argument(
-        "--adapters", nargs="+", choices=["cascade", "realtime"], default=["cascade", "realtime"]
+        "--adapters",
+        nargs="+",
+        choices=ADAPTER_CHOICES,
+        default=["cascade", "realtime"],
     )
     compare_parser.add_argument("--output", type=Path, default=Path("reports"))
     compare_parser.add_argument("--audio", action="store_true")

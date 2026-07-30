@@ -45,3 +45,10 @@ def test_compare_runs_every_adapter(tmp_path):
     assert "cascade" in md_path.read_text()
     assert "realtime" in md_path.read_text()
     assert json.loads(json_path.read_text())["scenario_id"] == "basic_booking"
+
+
+def test_compare_with_degraded_adapter_makes_failure_visible():
+    report = compare_evaluation("arjun_cancel", ["cascade", "degraded"])
+    scores = {run.adapter.value: run.evaluation.overall_score for run in report.runs}
+    assert scores["cascade"] == 1.0
+    assert scores["degraded"] < 0.60

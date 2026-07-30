@@ -73,8 +73,45 @@ class MockRealtimeAdapter(_DeterministicAdapter):
     latency_ms = 310.0
 
 
+class MockDegradedAdapter(_DeterministicAdapter):
+    """Intentionally unreliable pipeline used to demonstrate useful failures.
+
+    Even-numbered turns miss their expected tool and required response content,
+    exceed response-shape limits, and every turn breaches the latency budget.
+    This is a demo fixture, not a benchmark of any real provider.
+    """
+
+    name = "degraded"
+    latency_ms = 1450.0
+
+    def _respond(
+        self,
+        scenario: Scenario,
+        turn: Turn,
+        index: int,
+        audio_dir: Path | None,
+    ) -> TurnResult:
+        result = super()._respond(scenario, turn, index, audio_dir)
+        if index % 2 == 0:
+            result.tool_calls = []
+            result.assistant = (
+                "I am not sure? Could you repeat? Let me check? This may take a while."
+            )
+            if result.assistant_audio_path is not None:
+                result.assistant_audio_ms = audio.synth_speech(
+                    result.assistant,
+                    Path(result.assistant_audio_path),
+                    voice=f"{scenario.persona}-{self.name}",
+                )
+        return result
+
+
 def get_adapter(name: str) -> VoicePipelineAdapter:
-    adapters = {"cascade": MockCascadeAdapter, "realtime": MockRealtimeAdapter}
+    adapters = {
+        "cascade": MockCascadeAdapter,
+        "realtime": MockRealtimeAdapter,
+        "degraded": MockDegradedAdapter,
+    }
     try:
         return adapters[name]()
     except KeyError as exc:
