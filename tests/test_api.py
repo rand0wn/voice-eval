@@ -32,6 +32,18 @@ def test_create_and_fetch_compare(tmp_path, monkeypatch):
     assert fetched.status_code == 200
 
 
+def test_compare_accepts_degraded_demo_adapter(tmp_path, monkeypatch):
+    monkeypatch.setenv("VOICE_EVAL_REPORT_DIR", str(tmp_path))
+    response = TestClient(app).post(
+        "/compare",
+        json={"scenario": "arjun_cancel", "adapters": ["cascade", "degraded"]},
+    )
+    assert response.status_code == 201
+    runs = {run["adapter"]: run for run in response.json()["runs"]}
+    assert runs["cascade"]["evaluation"]["overall_score"] == 1.0
+    assert runs["degraded"]["evaluation"]["overall_score"] < 0.60
+
+
 def test_missing_compare():
     assert TestClient(app).get("/compare/unknown").status_code == 404
 
