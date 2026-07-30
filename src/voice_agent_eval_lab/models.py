@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 class AdapterKind(str, Enum):
     cascade = "cascade"
     realtime = "realtime"
+    degraded = "degraded"
 
 
 class Turn(BaseModel):
