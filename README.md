@@ -1,16 +1,20 @@
 # Voice Eval — a simulation module for voice AI pipelines
 
+[![CI](https://github.com/rand0wn/voice-eval/actions/workflows/ci.yml/badge.svg)](https://github.com/rand0wn/voice-eval/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
+
 Run scripted, multi-turn conversations through one or more voice-agent
 pipelines and get back a graded scorecard *and* real per-turn audio, not just
 a text diff. This is the same pattern used to validate a production voice
 agent before every deploy: same script, every pipeline candidate, identical
 grading rubric, latency percentiles instead of a single average.
 
-The included `cascade` and `realtime` adapters are deterministic mocks — no
-API keys, network access, telephony, or microphone required to see the full
-workflow, including audio generation. Swap in one real adapter (or ten) and
-nothing else changes: the scenarios, grading, CLI, and API are all
-provider-neutral.
+The included `cascade`, `realtime`, and intentionally failing `degraded`
+adapters are deterministic mocks — no API keys, network access, telephony, or
+microphone required to see the full workflow, including audio generation. Swap
+in one real adapter (or ten) and nothing else changes: the scenarios, grading,
+CLI, and API are all provider-neutral.
 
 ## What it does
 
@@ -21,9 +25,10 @@ provider-neutral.
   expected-tool recall, required content, question/sentence-count limits,
   latency budget, non-empty transcript — and reports *which specific rule*
   failed on which turn, not a single pass/fail blob.
-- **Captures real audio per turn.** Every simulated turn writes a playable
-  WAV file for both the user line and the agent's response, so you can
-  spot-check what a turn actually "sounds like" without a live call.
+- **Captures playable audio artifacts per turn.** Every simulated turn can
+  write a valid WAV file for both sides. The offline synthesizer uses
+  deterministic tones; replace its small interface with real TTS or captured
+  provider audio when evaluating speech quality.
 - **Compares pipelines head-to-head.** Run the identical scenario through
   every adapter you have and get a side-by-side table: overall score,
   average/P95 latency, tool recall — the numbers you need before choosing an
@@ -61,21 +66,27 @@ Add `--audio` to also synthesize a WAV file per turn under `reports/audio/<run-i
 voice-eval run --scenario priya_reschedule --adapter cascade --audio
 ```
 
-Compare every built-in pipeline on the same scenario:
+See useful failures immediately by comparing the healthy cascade fixture with
+the intentionally unreliable demo adapter:
 
 ```bash
-voice-eval compare --scenario arjun_cancel --adapters cascade realtime
+voice-eval compare --scenario arjun_cancel --adapters cascade degraded
 ```
 
 ```text
 | Adapter  | Overall | Avg latency (ms) | P95 latency (ms) | Tool recall |
-|----------|---------|-------------------|--------------------|-------------|
-| cascade  | 100.00% | 640.0             | 640.0              | 100.00%     |
-| realtime | 100.00% | 310.0             | 310.0              | 100.00%     |
+|----------|---------|------------------|------------------|-------------|
+| cascade  | 100.00% | 640.0            | 640.0            | 100.00%     |
+| degraded | 55.27%  | 1450.0           | 1450.0           | 33.33%      |
 ```
 
 Both commands write a JSON report (for automation) and a Markdown scorecard
-(for humans) under `reports/`.
+(for humans) under `reports/`. See the committed
+[example comparison](examples/reports/arjun_cancel_comparison.md).
+
+`degraded` is a demonstration fixture, not a result from any real provider.
+It deliberately misses tools, omits required content, exceeds response-shape
+limits, and breaches the latency budget.
 
 ## Run the API
 
@@ -119,7 +130,7 @@ Environment variables:
 src/voice_agent_eval_lab/
   models.py      # Scenario, Turn, TurnResult, TurnGrade, Evaluation, API request/response schemas
   audio.py        # deterministic WAV synthesis — swap for a real TTS call
-  adapters.py     # VoicePipelineAdapter contract + the two mock pipelines
+  adapters.py     # VoicePipelineAdapter contract + healthy/failing mock pipelines
   grading.py      # per-turn rule grading + aggregate scoring
   runner.py       # orchestrates: load scenario -> run adapter(s) -> grade -> write reports
   scenarios.py    # YAML loading
@@ -222,10 +233,12 @@ flowchart LR
   Runner --> Adapter{Pipeline adapter}
   Adapter --> Cascade[Mock cascade]
   Adapter --> Realtime[Mock realtime]
+  Adapter --> Degraded[Intentionally failing demo]
   Adapter --> Real[Your real provider]
   Adapter --> Audio[audio.synth_speech per turn]
   Cascade --> Grade[Per-turn grading]
   Realtime --> Grade
+  Degraded --> Grade
   Real --> Grade
   Grade --> JSON[JSON report]
   Grade --> MD[Markdown scorecard]
