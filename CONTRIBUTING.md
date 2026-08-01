@@ -37,6 +37,7 @@ Run a complete local smoke test:
 ```bash
 voice-eval run --scenario basic_booking --adapter cascade
 voice-eval compare --scenario arjun_cancel --adapters cascade degraded --audio
+voice-eval suite --adapter cascade --min-score 1 --min-tool-recall 1 --max-p95-ms 900
 ```
 
 The comparison should produce JSON and Markdown reports under `reports/`, plus
@@ -60,10 +61,10 @@ latency. Add a test proving that the packaged scenario loads successfully.
 
 ### Add an adapter
 
-Implement `VoicePipelineAdapter.execute` in
-`src/voice_agent_eval_lab/adapters.py`, then register the adapter in
-`get_adapter()`. Return the shared `TurnResult` model so the existing runner
-and graders remain provider-neutral.
+Implement `VoicePipelineAdapter.execute`, then register the adapter directly or
+publish a `voice_agent_eval_lab.adapters` entry point as described in
+`docs/adapter-plugins.md`. Return the shared `TurnResult` model so the existing
+runner and graders remain provider-neutral.
 
 If the adapter calls a paid or networked service:
 
@@ -96,6 +97,7 @@ Before opening a pull request, run:
 pytest -q
 python -m compileall -q src tests
 voice-eval run --scenario basic_booking --adapter cascade
+voice-eval suite --adapter cascade --min-score 1 --min-tool-recall 1 --max-p95-ms 900
 ```
 
 If you change packaging, also verify a clean wheel install:

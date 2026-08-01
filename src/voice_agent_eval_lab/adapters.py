@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from importlib import metadata
 from pathlib import Path
+from typing import Callable
 
 from . import audio
 from .models import Scenario, ToolCall, Turn, TurnResult
@@ -106,13 +108,71 @@ class MockDegradedAdapter(_DeterministicAdapter):
         return result
 
 
+AdapterFactory = Callable[[], VoicePipelineAdapter]
+_ADAPTERS: dict[str, AdapterFactory] = {
+    "cascade": MockCascadeAdapter,
+    "realtime": MockRealtimeAdapter,
+    "degraded": MockDegradedAdapter,
+}
+_ENTRY_POINTS_LOADED = False
+
+
+def register_adapter(name: str, factory: AdapterFactory, *, replace: bool = False) -> None:
+    """Register an adapter factory without modifying this package.
+
+    Libraries should normally expose the factory through the
+    ``voice_agent_eval_lab.adapters`` entry-point group. Direct registration is
+    useful for applications and tests.
+    """
+
+    normalized = name.strip().lower()
+    if not normalized:
+        raise ValueError("Adapter name cannot be empty")
+    if normalized in _ADAPTERS and not replace:
+        raise ValueError(f"Adapter {normalized!r} is already registered")
+    if not callable(factory):
+        raise TypeError("Adapter factory must be callable")
+    _ADAPTERS[normalized] = factory
+
+
+def _load_entry_points() -> None:
+    global _ENTRY_POINTS_LOADED
+    if _ENTRY_POINTS_LOADED:
+        return
+    _ENTRY_POINTS_LOADED = True
+    for entry_point in metadata.entry_points(group="voice_agent_eval_lab.adapters"):
+        if entry_point.name.strip().lower() in _ADAPTERS:
+            raise ValueError(
+                f"Adapter entry point {entry_point.name!r} duplicates an existing adapter"
+            )
+        register_adapter(entry_point.name, entry_point.load())
+
+
+def available_adapters() -> tuple[str, ...]:
+    _load_entry_points()
+    return tuple(sorted(_ADAPTERS))
+
+
 def get_adapter(name: str) -> VoicePipelineAdapter:
-    adapters = {
-        "cascade": MockCascadeAdapter,
-        "realtime": MockRealtimeAdapter,
-        "degraded": MockDegradedAdapter,
-    }
+    _load_entry_points()
+    normalized = name.strip().lower()
     try:
-        return adapters[name]()
+        adapter = _ADAPTERS[normalized]()
     except KeyError as exc:
-        raise ValueError(f"Unknown adapter: {name}") from exc
+        choices = ", ".join(available_adapters())
+        raise ValueError(f"Unknown adapter {name!r}. Available adapters: {choices}") from exc
+    if not isinstance(adapter, VoicePipelineAdapter):
+        raise TypeError(
+            f"Adapter factory {normalized!r} returned {type(adapter).__name__}, "
+            "expected VoicePipelineAdapter"
+        )
+    return adapter
+
+
+def _livekit_factory() -> VoicePipelineAdapter:
+    from .livekit_adapter import LiveKitAdapter
+
+    return LiveKitAdapter()
+
+
+register_adapter("livekit", _livekit_factory)

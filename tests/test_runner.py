@@ -40,7 +40,7 @@ def test_run_with_audio_writes_one_wav_pair_per_turn(tmp_path):
 
 def test_compare_runs_every_adapter(tmp_path):
     report = compare_evaluation("basic_booking", ["cascade", "realtime"])
-    assert [run.adapter.value for run in report.runs] == ["cascade", "realtime"]
+    assert [run.adapter for run in report.runs] == ["cascade", "realtime"]
     json_path, md_path = write_compare_reports(report, tmp_path)
     assert "cascade" in md_path.read_text()
     assert "realtime" in md_path.read_text()
@@ -49,6 +49,6 @@ def test_compare_runs_every_adapter(tmp_path):
 
 def test_compare_with_degraded_adapter_makes_failure_visible():
     report = compare_evaluation("arjun_cancel", ["cascade", "degraded"])
-    scores = {run.adapter.value: run.evaluation.overall_score for run in report.runs}
+    scores = {run.adapter: run.evaluation.overall_score for run in report.runs}
     assert scores["cascade"] == 1.0
     assert scores["degraded"] < 0.60

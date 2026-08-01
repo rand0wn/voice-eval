@@ -41,6 +41,9 @@ adapter, scenario, grading rule, or documentation improvement.
   every adapter you have and get a side-by-side table: overall score,
   average/P95 latency, tool recall — the numbers you need before choosing an
   architecture, not after.
+- **Runs the whole scenario suite as a CI gate.** Set minimum score/tool-recall
+  and maximum P95 thresholds; a regression writes its diagnostic report and
+  exits non-zero.
 - **Ships as both a CLI and a FastAPI service**, so it drops into a terminal
   workflow or a CI job equally well.
 
@@ -96,6 +99,35 @@ Both commands write a JSON report (for automation) and a Markdown scorecard
 It deliberately misses tools, omits required content, exceeds response-shape
 limits, and breaches the latency budget.
 
+Run every bundled scenario and make the command fail when a release candidate
+misses the required quality or latency bar:
+
+```bash
+voice-eval suite \
+  --adapter cascade \
+  --min-score 0.90 \
+  --min-tool-recall 1.0 \
+  --max-p95-ms 900
+```
+
+The same gates work with `run` and `compare`. Reports are written before a
+failed gate exits with status `1`, so the CI job retains useful diagnostics.
+
+Run the complete terminal walkthrough locally with:
+
+```bash
+scripts/demo.sh
+```
+
+Or replay the committed, under-30-second terminal recording after installing
+[`asciinema`](https://asciinema.org/):
+
+```bash
+asciinema play docs/voice-eval-demo.cast
+```
+
+Regenerate it with `scripts/record-demo.sh` whenever the CLI output changes.
+
 ## Run the API
 
 ```bash
@@ -138,11 +170,12 @@ Environment variables:
 src/voice_agent_eval_lab/
   models.py      # Scenario, Turn, TurnResult, TurnGrade, Evaluation, API request/response schemas
   audio.py        # deterministic WAV synthesis — swap for a real TTS call
-  adapters.py     # VoicePipelineAdapter contract + healthy/failing mock pipelines
+  adapters.py     # adapter contract, built-ins, registration, and plugin discovery
+  livekit_adapter.py # LiveKit AgentSession event collector + evaluation adapter
   grading.py      # per-turn rule grading + aggregate scoring
   runner.py       # orchestrates: load scenario -> run adapter(s) -> grade -> write reports
   scenarios.py    # YAML loading
-  cli.py          # `voice-eval run` / `voice-eval compare`
+  cli.py          # `voice-eval run` / `voice-eval compare` / `voice-eval suite`
   api.py          # FastAPI: /runs, /compare, /scenarios, /health
 scenarios/        # YAML conversation scripts
 tests/            # one test module per source module above
@@ -190,9 +223,27 @@ class MyRealAdapter(VoicePipelineAdapter):
         ...
 ```
 
-Register it in `get_adapter()`. Nothing in `grading.py`, `runner.py`, the
-CLI, or the API needs to change — they only depend on the `TurnResult`
-contract.
+Register it from application code with
+`register_adapter("my-provider", MyRealAdapter)`, or publish it as a Python
+entry-point plugin so users only need to install your package. Nothing in
+`grading.py`, `runner.py`, the CLI, or the API needs to change — they only
+depend on the `TurnResult` contract. See the
+[adapter plugin guide](docs/adapter-plugins.md).
+
+### Connect LiveKit
+
+Install the optional integration dependency:
+
+```bash
+python -m pip install -e ".[dev,livekit]"
+```
+
+Attach `LiveKitEventCollector` to the `AgentSession` your application already
+owns, then expose a small turn-client factory through
+`VOICE_EVAL_LIVEKIT_CLIENT`. The adapter records final transcripts, executed
+tools, end-to-end latency, available LLM/TTS component timings, and session
+metadata. It intentionally does not claim audio export or interruption
+simulation. See the [LiveKit adapter guide](docs/livekit.md).
 
 For trustworthy comparisons across real providers:
 
@@ -236,13 +287,15 @@ docker run --rm -p 8000:8000 voice-eval
 ```mermaid
 flowchart LR
   YAML[Scenario YAML] --> Runner
-  CLI[CLI: run / compare] --> Runner
+  CLI[CLI: run / compare / suite] --> Runner
   API[FastAPI: /runs /compare] --> Runner
   Runner --> Adapter{Pipeline adapter}
   Adapter --> Cascade[Mock cascade]
   Adapter --> Realtime[Mock realtime]
   Adapter --> Degraded[Intentionally failing demo]
   Adapter --> Real[Your real provider]
+  Adapter --> LiveKit[LiveKit AgentSession]
+  Adapter --> Plugin[Installed adapter plugin]
   Adapter --> Audio[audio.synth_speech per turn]
   Cascade --> Grade[Per-turn grading]
   Realtime --> Grade
