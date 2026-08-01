@@ -1,5 +1,6 @@
 from voice_agent_eval_lab.adapters import MockCascadeAdapter, MockDegradedAdapter
-from voice_agent_eval_lab.grading import evaluate
+from voice_agent_eval_lab.grading import evaluate, grade_turn
+from voice_agent_eval_lab.models import Scenario, ToolCall, Turn, TurnResult
 from voice_agent_eval_lab.scenarios import load_scenario
 
 
@@ -47,3 +48,49 @@ def test_degraded_adapter_exposes_multiple_failure_types():
         "max_sentences_per_turn",
         "latency_budget",
     }.issubset(evaluation.turn_grades[0].failed_rules)
+
+
+def test_s2s_turn_with_playable_audio_and_no_transcript_skips_text_rules(tmp_path):
+    scenario = Scenario(id="s2s", title="S2S", turns=[Turn(user="Hi", expected_tools=["book"])])
+    wav = tmp_path / "bot.wav"
+    wav.write_bytes(b"\x00" * 200)
+    result = TurnResult(
+        user="Hi",
+        assistant="",
+        latency_ms=100,
+        tool_calls=[ToolCall(name="book")],
+        assistant_audio_path=str(wav),
+    )
+    grade = grade_turn(scenario, scenario.turns[0], result, 0)
+    assert grade.failed_rules == []
+    assert grade.score == 1.0
+
+
+def test_s2s_turn_missing_audio_fails_playable_rule(tmp_path):
+    scenario = Scenario(id="s2s2", title="S2S", turns=[Turn(user="Hi")])
+    missing_wav = tmp_path / "missing.wav"
+    result = TurnResult(
+        user="Hi",
+        assistant="",
+        latency_ms=100,
+        assistant_audio_path=str(missing_wav),
+    )
+    grade = grade_turn(scenario, scenario.turns[0], result, 0)
+    assert "assistant_audio_playable" in grade.failed_rules
+
+
+def test_s2s_time_to_first_audio_byte_budget(tmp_path):
+    scenario = Scenario(
+        id="s2s3", title="S2S", turns=[Turn(user="Hi")], max_time_to_first_audio_byte_ms=100
+    )
+    wav = tmp_path / "bot.wav"
+    wav.write_bytes(b"\x00" * 200)
+    result = TurnResult(
+        user="Hi",
+        assistant="",
+        latency_ms=50,
+        assistant_audio_path=str(wav),
+        time_to_first_audio_byte_ms=500,
+    )
+    grade = grade_turn(scenario, scenario.turns[0], result, 0)
+    assert "time_to_first_audio_byte_budget" in grade.failed_rules

@@ -27,6 +27,7 @@ class Scenario(BaseModel):
     max_latency_ms: float = 1000
     max_questions_per_turn: int = 1
     max_sentences_per_turn: int = 3
+    max_time_to_first_audio_byte_ms: float | None = None
 
 
 class ToolCall(BaseModel):
@@ -42,6 +43,9 @@ class TurnResult(BaseModel):
     user_audio_path: str | None = None
     assistant_audio_path: str | None = None
     assistant_audio_ms: float | None = None
+    time_to_first_audio_byte_ms: float | None = None
+    component_timings_ms: dict[str, float] = Field(default_factory=dict)
+    session_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class TurnGrade(BaseModel):
@@ -63,13 +67,13 @@ class Evaluation(BaseModel):
 
 class RunRequest(BaseModel):
     scenario: str = "basic_booking"
-    adapter: AdapterKind = AdapterKind.cascade
+    adapter: str = "cascade"
 
 
 class RunReport(BaseModel):
     id: str
     scenario_id: str
-    adapter: AdapterKind
+    adapter: str
     turns: list[TurnResult]
     evaluation: Evaluation
     audio_dir: str | None = None
@@ -77,12 +81,23 @@ class RunReport(BaseModel):
 
 class CompareRequest(BaseModel):
     scenario: str = "basic_booking"
-    adapters: list[AdapterKind] = Field(
-        default_factory=lambda: [AdapterKind.cascade, AdapterKind.realtime]
-    )
+    adapters: list[str] = Field(default_factory=lambda: ["cascade", "realtime"])
 
 
 class CompareReport(BaseModel):
     id: str
     scenario_id: str
     runs: list[RunReport]
+
+
+class SuiteReport(BaseModel):
+    """Aggregate result from running one adapter over multiple scenarios."""
+
+    id: str
+    adapter: str
+    runs: list[RunReport]
+    scenario_count: int
+    overall_score: float
+    tool_recall: float
+    average_latency_ms: float
+    p95_latency_ms: float

@@ -24,7 +24,7 @@ def _audio_root() -> Path | None:
 @app.post("/runs", response_model=RunReport, status_code=201)
 def create_run(request: RunRequest) -> RunReport:
     try:
-        report = run_evaluation(request.scenario, request.adapter.value, audio_root=_audio_root())
+        report = run_evaluation(request.scenario, request.adapter, audio_root=_audio_root())
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     _runs[report.id] = report
@@ -44,7 +44,7 @@ def create_compare(request: CompareRequest) -> CompareReport:
     try:
         report = compare_evaluation(
             request.scenario,
-            [adapter.value for adapter in request.adapters],
+            request.adapters,
             audio_root=_audio_root(),
         )
     except (FileNotFoundError, ValueError) as exc:

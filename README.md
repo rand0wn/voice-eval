@@ -16,6 +16,14 @@ microphone required to see the full workflow, including audio generation. Swap
 in one real adapter (or ten) and nothing else changes: the scenarios, grading,
 CLI, and API are all provider-neutral.
 
+> **Stop manually retesting your voice agent.**
+> [Run your first repeatable evaluation](#quickstart), then connect your own
+> pipeline and share what the scorecard catches.
+
+**Ready to help?** Try a scenario, [open an issue](https://github.com/rand0wn/voice-eval/issues)
+with your results, or read the [contribution guide](CONTRIBUTING.md) to add an
+adapter, scenario, grading rule, or documentation improvement.
+
 ## What it does
 
 - **Scripts conversations, not single prompts.** A scenario is a persona and
@@ -29,10 +37,18 @@ CLI, and API are all provider-neutral.
   write a valid WAV file for both sides. The offline synthesizer uses
   deterministic tones; replace its small interface with real TTS or captured
   provider audio when evaluating speech quality.
+- **Drives and grades native speech-to-speech pipelines.** `--audio-mode s2s`
+  synthesizes each turn to audio, sends it into the adapter, and grades the
+  pipeline's returned audio directly — for providers (OpenAI Realtime,
+  ElevenLabs Conversational AI, and similar) that never expose intermediate
+  text. See [S2S testing](docs/s2s-testing.md).
 - **Compares pipelines head-to-head.** Run the identical scenario through
   every adapter you have and get a side-by-side table: overall score,
   average/P95 latency, tool recall — the numbers you need before choosing an
   architecture, not after.
+- **Runs the whole scenario suite as a CI gate.** Set minimum score/tool-recall
+  and maximum P95 thresholds; a regression writes its diagnostic report and
+  exits non-zero.
 - **Ships as both a CLI and a FastAPI service**, so it drops into a terminal
   workflow or a CI job equally well.
 
@@ -66,6 +82,17 @@ Add `--audio` to also synthesize a WAV file per turn under `reports/audio/<run-i
 voice-eval run --scenario priya_reschedule --adapter cascade --audio
 ```
 
+Or drive the scenario with synthesized user audio and grade the pipeline's
+*returned* audio directly, using the offline `mock-s2s` demo adapter (audio is
+always written in this mode):
+
+```bash
+voice-eval run --scenario basic_booking --adapter mock-s2s --audio-mode s2s
+```
+
+See [S2S testing](docs/s2s-testing.md) for the adapter contract and how to
+connect a real native speech-to-speech pipeline.
+
 See useful failures immediately by comparing the healthy cascade fixture with
 the intentionally unreliable demo adapter:
 
@@ -87,6 +114,35 @@ Both commands write a JSON report (for automation) and a Markdown scorecard
 `degraded` is a demonstration fixture, not a result from any real provider.
 It deliberately misses tools, omits required content, exceeds response-shape
 limits, and breaches the latency budget.
+
+Run every bundled scenario and make the command fail when a release candidate
+misses the required quality or latency bar:
+
+```bash
+voice-eval suite \
+  --adapter cascade \
+  --min-score 0.90 \
+  --min-tool-recall 1.0 \
+  --max-p95-ms 900
+```
+
+The same gates work with `run` and `compare`. Reports are written before a
+failed gate exits with status `1`, so the CI job retains useful diagnostics.
+
+Run the complete terminal walkthrough locally with:
+
+```bash
+scripts/demo.sh
+```
+
+Or replay the committed, under-30-second terminal recording after installing
+[`asciinema`](https://asciinema.org/):
+
+```bash
+asciinema play docs/voice-eval-demo.cast
+```
+
+Regenerate it with `scripts/record-demo.sh` whenever the CLI output changes.
 
 ## Run the API
 
@@ -130,11 +186,16 @@ Environment variables:
 src/voice_agent_eval_lab/
   models.py      # Scenario, Turn, TurnResult, TurnGrade, Evaluation, API request/response schemas
   audio.py        # deterministic WAV synthesis — swap for a real TTS call
-  adapters.py     # VoicePipelineAdapter contract + healthy/failing mock pipelines
+  adapters.py     # adapter contract, built-ins, registration, and plugin discovery
+  livekit_adapter.py # LiveKit AgentSession event collector + evaluation adapter
+  s2s.py          # native speech-to-speech extension point (S2STurnObservation, S2SPipelineAdapter, mock-s2s)
+  elevenlabs_adapter.py # ElevenLabs Conversational AI WebSocket event collector + evaluation adapter
+  vapi_adapter.py # Vapi assistant/chat client + evaluation adapter
+  pipecat_adapter.py # Pipecat PipelineTask client protocol + evaluation adapter
   grading.py      # per-turn rule grading + aggregate scoring
   runner.py       # orchestrates: load scenario -> run adapter(s) -> grade -> write reports
   scenarios.py    # YAML loading
-  cli.py          # `voice-eval run` / `voice-eval compare`
+  cli.py          # `voice-eval run` / `voice-eval compare` / `voice-eval suite`
   api.py          # FastAPI: /runs, /compare, /scenarios, /health
 scenarios/        # YAML conversation scripts
 tests/            # one test module per source module above
@@ -182,9 +243,69 @@ class MyRealAdapter(VoicePipelineAdapter):
         ...
 ```
 
-Register it in `get_adapter()`. Nothing in `grading.py`, `runner.py`, the
-CLI, or the API needs to change — they only depend on the `TurnResult`
-contract.
+Register it from application code with
+`register_adapter("my-provider", MyRealAdapter)`, or publish it as a Python
+entry-point plugin so users only need to install your package. Nothing in
+`grading.py`, `runner.py`, the CLI, or the API needs to change — they only
+depend on the `TurnResult` contract. See the
+[adapter plugin guide](docs/adapter-plugins.md).
+
+### Connect LiveKit
+
+Install the optional integration dependency:
+
+```bash
+python -m pip install -e ".[dev,livekit]"
+```
+
+Attach `LiveKitEventCollector` to the `AgentSession` your application already
+owns, then expose a small turn-client factory through
+`VOICE_EVAL_LIVEKIT_CLIENT`. The adapter records final transcripts, executed
+tools, end-to-end latency, available LLM/TTS component timings, and session
+metadata. It intentionally does not claim audio export or interruption
+simulation. See the [LiveKit adapter guide](docs/livekit.md).
+
+### Connect ElevenLabs Conversational AI
+
+Install the optional integration dependency:
+
+```bash
+python -m pip install -e ".[dev,elevenlabs]"
+```
+
+Set `ELEVENLABS_API_KEY` and `ELEVENLABS_AGENT_ID` for an existing
+Conversational AI agent, or inject your own client via
+`VOICE_EVAL_ELEVENLABS_CLIENT`. The adapter drives the agent's WebSocket API,
+recording transcripts, client tool calls, and — when the session streams
+`audio` events — the agent's real synthesized audio. See the
+[ElevenLabs adapter guide](docs/elevenlabs.md).
+
+### Connect Vapi
+
+No optional dependency is required; the real client uses only the standard
+library. Set `VAPI_API_KEY` and `VAPI_ASSISTANT_ID`, or expose a turn-client
+factory through `VOICE_EVAL_VAPI_CLIENT` if you want to drive Vapi's `/call`
+REST API and websocket/webhook event stream yourself. Missing credentials
+raise a clear error instead of a stack trace. See the
+[Vapi adapter guide](docs/vapi.md).
+
+### Connect Pipecat
+
+Pipecat is a self-hosted framework rather than a hosted API: your application
+composes its own STT/LLM/TTS services into a `Pipeline`/`PipelineTask`. Wrap
+that pipeline in a small client implementing `PipecatTurnClient.run_turn`,
+then expose a zero-argument factory through `VOICE_EVAL_PIPECAT_CLIENT`. The
+adapter has no required dependency on `pipecat-ai` itself — install it only
+if your own client code needs it:
+
+```bash
+python -m pip install -e ".[dev,pipecat]"
+```
+
+The adapter records final transcripts, executed tools, end-to-end latency,
+available per-processor component timings, and session metadata. It
+intentionally does not claim audio export. See the
+[Pipecat adapter guide](docs/pipecat.md).
 
 For trustworthy comparisons across real providers:
 
@@ -228,13 +349,18 @@ docker run --rm -p 8000:8000 voice-eval
 ```mermaid
 flowchart LR
   YAML[Scenario YAML] --> Runner
-  CLI[CLI: run / compare] --> Runner
+  CLI[CLI: run / compare / suite] --> Runner
   API[FastAPI: /runs /compare] --> Runner
   Runner --> Adapter{Pipeline adapter}
   Adapter --> Cascade[Mock cascade]
   Adapter --> Realtime[Mock realtime]
   Adapter --> Degraded[Intentionally failing demo]
   Adapter --> Real[Your real provider]
+  Adapter --> LiveKit[LiveKit AgentSession]
+  Adapter --> ElevenLabs[ElevenLabs Conversational AI]
+  Adapter --> Vapi[Vapi assistant/chat]
+  Adapter --> Pipecat[Pipecat PipelineTask]
+  Adapter --> Plugin[Installed adapter plugin]
   Adapter --> Audio[audio.synth_speech per turn]
   Cascade --> Grade[Per-turn grading]
   Realtime --> Grade
@@ -283,6 +409,19 @@ This is intentionally a simulation and grading core, not a full product — it
 excludes telephony, authentication, billing, and a dashboard UI. It's the
 evaluation layer you embed around whichever real voice pipeline you build or
 buy.
+
+## Contributing
+
+Contributions are welcome, including small documentation fixes. The most useful
+ways to help are:
+
+- add a synthetic multi-turn scenario that exposes a real failure mode;
+- connect another voice pipeline through a provider-neutral adapter;
+- improve grading, reports, or CI integration;
+- report a reproducible bug or share how the harness behaved on your pipeline.
+
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). It explains setup, tests, pull
+requests, privacy expectations, and good first contributions.
 
 ## License
 
