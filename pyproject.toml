@@ -13,6 +13,7 @@ dependencies = ["fastapi>=0.110", "pydantic>=2", "PyYAML>=6", "uvicorn>=0.29"]
 [project.optional-dependencies]
 dev = ["httpx>=0.27", "pytest>=8"]
 livekit = ["livekit-agents>=1.3"]
+pipecat = ["pipecat-ai>=0.0.50"]
 
 [project.scripts]
 voice-eval = "voice_agent_eval_lab.cli:main"
