@@ -176,3 +176,12 @@ def _livekit_factory() -> VoicePipelineAdapter:
 
 
 register_adapter("livekit", _livekit_factory)
+
+
+def _pipecat_factory() -> VoicePipelineAdapter:
+    from .pipecat_adapter import PipecatAdapter
+
+    return PipecatAdapter()
+
+
+register_adapter("pipecat", _pipecat_factory)
