@@ -37,6 +37,11 @@ adapter, scenario, grading rule, or documentation improvement.
   write a valid WAV file for both sides. The offline synthesizer uses
   deterministic tones; replace its small interface with real TTS or captured
   provider audio when evaluating speech quality.
+- **Drives and grades native speech-to-speech pipelines.** `--audio-mode s2s`
+  synthesizes each turn to audio, sends it into the adapter, and grades the
+  pipeline's returned audio directly — for providers (OpenAI Realtime,
+  ElevenLabs Conversational AI, and similar) that never expose intermediate
+  text. See [S2S testing](docs/s2s-testing.md).
 - **Compares pipelines head-to-head.** Run the identical scenario through
   every adapter you have and get a side-by-side table: overall score,
   average/P95 latency, tool recall — the numbers you need before choosing an
@@ -76,6 +81,17 @@ Add `--audio` to also synthesize a WAV file per turn under `reports/audio/<run-i
 ```bash
 voice-eval run --scenario priya_reschedule --adapter cascade --audio
 ```
+
+Or drive the scenario with synthesized user audio and grade the pipeline's
+*returned* audio directly, using the offline `mock-s2s` demo adapter (audio is
+always written in this mode):
+
+```bash
+voice-eval run --scenario basic_booking --adapter mock-s2s --audio-mode s2s
+```
+
+See [S2S testing](docs/s2s-testing.md) for the adapter contract and how to
+connect a real native speech-to-speech pipeline.
 
 See useful failures immediately by comparing the healthy cascade fixture with
 the intentionally unreliable demo adapter:
@@ -172,6 +188,7 @@ src/voice_agent_eval_lab/
   audio.py        # deterministic WAV synthesis — swap for a real TTS call
   adapters.py     # adapter contract, built-ins, registration, and plugin discovery
   livekit_adapter.py # LiveKit AgentSession event collector + evaluation adapter
+  s2s.py          # native speech-to-speech extension point (S2STurnObservation, S2SPipelineAdapter, mock-s2s)
   grading.py      # per-turn rule grading + aggregate scoring
   runner.py       # orchestrates: load scenario -> run adapter(s) -> grade -> write reports
   scenarios.py    # YAML loading

@@ -78,9 +78,19 @@ def _enforce_gates(reports: list[RunReport], args: argparse.Namespace) -> None:
     raise SystemExit(1)
 
 
+def _audio_root(args: argparse.Namespace) -> Path | None:
+    # S2S mode always synthesizes and persists audio, since audio is the only
+    # channel it drives/grades; --audio only matters in text mode.
+    if args.audio or args.audio_mode == "s2s":
+        return args.output / "audio"
+    return None
+
+
 def _run(args: argparse.Namespace) -> None:
-    audio_root = args.output / "audio" if args.audio else None
-    report = run_evaluation(args.scenario, args.adapter, audio_root=audio_root)
+    audio_root = _audio_root(args)
+    report = run_evaluation(
+        args.scenario, args.adapter, audio_root=audio_root, audio_mode=args.audio_mode
+    )
     json_path, md_path = write_reports(report, args.output)
     print(markdown(report))
     print(f"Wrote {json_path} and {md_path}")
@@ -90,8 +100,10 @@ def _run(args: argparse.Namespace) -> None:
 
 
 def _compare(args: argparse.Namespace) -> None:
-    audio_root = args.output / "audio" if args.audio else None
-    report = compare_evaluation(args.scenario, args.adapters, audio_root=audio_root)
+    audio_root = _audio_root(args)
+    report = compare_evaluation(
+        args.scenario, args.adapters, audio_root=audio_root, audio_mode=args.audio_mode
+    )
     json_path, md_path = write_compare_reports(report, args.output)
     print(comparison_markdown(report))
     print(f"Wrote {json_path} and {md_path}")
@@ -99,8 +111,8 @@ def _compare(args: argparse.Namespace) -> None:
 
 
 def _suite(args: argparse.Namespace) -> None:
-    audio_root = args.output / "audio" if args.audio else None
-    report = run_suite(args.adapter, args.scenarios, audio_root=audio_root)
+    audio_root = _audio_root(args)
+    report = run_suite(args.adapter, args.scenarios, audio_root=audio_root, audio_mode=args.audio_mode)
     json_path, md_path = write_suite_reports(report, args.output)
     print(suite_markdown(report))
     print(f"Wrote {json_path} and {md_path}")
@@ -121,6 +133,14 @@ def main() -> None:
     run_parser.add_argument(
         "--audio", action="store_true", help="Synthesize a WAV file per turn under reports/audio/"
     )
+    run_parser.add_argument(
+        "--audio-mode",
+        choices=["text", "s2s"],
+        default="text",
+        help="'text' drives the pipeline with turn text (default); 's2s' drives it with "
+        "synthesized user audio and grades the returned audio directly (requires an "
+        "S2S-capable adapter, e.g. mock-s2s)",
+    )
     _add_gates(run_parser)
     run_parser.set_defaults(func=_run)
 
@@ -136,6 +156,7 @@ def main() -> None:
     )
     compare_parser.add_argument("--output", type=Path, default=Path("reports"))
     compare_parser.add_argument("--audio", action="store_true")
+    compare_parser.add_argument("--audio-mode", choices=["text", "s2s"], default="text")
     _add_gates(compare_parser)
     compare_parser.set_defaults(func=_compare)
 
@@ -150,6 +171,7 @@ def main() -> None:
     suite_parser.add_argument("--adapter", choices=adapter_choices, default="cascade")
     suite_parser.add_argument("--output", type=Path, default=Path("reports"))
     suite_parser.add_argument("--audio", action="store_true")
+    suite_parser.add_argument("--audio-mode", choices=["text", "s2s"], default="text")
     _add_gates(suite_parser)
     suite_parser.set_defaults(func=_suite)
 
