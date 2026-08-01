@@ -189,3 +189,30 @@ def _mock_s2s_factory() -> VoicePipelineAdapter:
 
 
 register_adapter("mock-s2s", _mock_s2s_factory)
+
+
+def _elevenlabs_factory() -> VoicePipelineAdapter:
+    from .elevenlabs_adapter import ElevenLabsAdapter
+
+    return ElevenLabsAdapter()
+
+
+register_adapter("elevenlabs", _elevenlabs_factory)
+
+
+def _vapi_factory() -> VoicePipelineAdapter:
+    from .vapi_adapter import VapiAdapter
+
+    return VapiAdapter()
+
+
+register_adapter("vapi", _vapi_factory)
+
+
+def _pipecat_factory() -> VoicePipelineAdapter:
+    from .pipecat_adapter import PipecatAdapter
+
+    return PipecatAdapter()
+
+
+register_adapter("pipecat", _pipecat_factory)

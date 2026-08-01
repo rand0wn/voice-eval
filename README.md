@@ -189,6 +189,9 @@ src/voice_agent_eval_lab/
   adapters.py     # adapter contract, built-ins, registration, and plugin discovery
   livekit_adapter.py # LiveKit AgentSession event collector + evaluation adapter
   s2s.py          # native speech-to-speech extension point (S2STurnObservation, S2SPipelineAdapter, mock-s2s)
+  elevenlabs_adapter.py # ElevenLabs Conversational AI WebSocket event collector + evaluation adapter
+  vapi_adapter.py # Vapi assistant/chat client + evaluation adapter
+  pipecat_adapter.py # Pipecat PipelineTask client protocol + evaluation adapter
   grading.py      # per-turn rule grading + aggregate scoring
   runner.py       # orchestrates: load scenario -> run adapter(s) -> grade -> write reports
   scenarios.py    # YAML loading
@@ -262,6 +265,48 @@ tools, end-to-end latency, available LLM/TTS component timings, and session
 metadata. It intentionally does not claim audio export or interruption
 simulation. See the [LiveKit adapter guide](docs/livekit.md).
 
+### Connect ElevenLabs Conversational AI
+
+Install the optional integration dependency:
+
+```bash
+python -m pip install -e ".[dev,elevenlabs]"
+```
+
+Set `ELEVENLABS_API_KEY` and `ELEVENLABS_AGENT_ID` for an existing
+Conversational AI agent, or inject your own client via
+`VOICE_EVAL_ELEVENLABS_CLIENT`. The adapter drives the agent's WebSocket API,
+recording transcripts, client tool calls, and — when the session streams
+`audio` events — the agent's real synthesized audio. See the
+[ElevenLabs adapter guide](docs/elevenlabs.md).
+
+### Connect Vapi
+
+No optional dependency is required; the real client uses only the standard
+library. Set `VAPI_API_KEY` and `VAPI_ASSISTANT_ID`, or expose a turn-client
+factory through `VOICE_EVAL_VAPI_CLIENT` if you want to drive Vapi's `/call`
+REST API and websocket/webhook event stream yourself. Missing credentials
+raise a clear error instead of a stack trace. See the
+[Vapi adapter guide](docs/vapi.md).
+
+### Connect Pipecat
+
+Pipecat is a self-hosted framework rather than a hosted API: your application
+composes its own STT/LLM/TTS services into a `Pipeline`/`PipelineTask`. Wrap
+that pipeline in a small client implementing `PipecatTurnClient.run_turn`,
+then expose a zero-argument factory through `VOICE_EVAL_PIPECAT_CLIENT`. The
+adapter has no required dependency on `pipecat-ai` itself — install it only
+if your own client code needs it:
+
+```bash
+python -m pip install -e ".[dev,pipecat]"
+```
+
+The adapter records final transcripts, executed tools, end-to-end latency,
+available per-processor component timings, and session metadata. It
+intentionally does not claim audio export. See the
+[Pipecat adapter guide](docs/pipecat.md).
+
 For trustworthy comparisons across real providers:
 
 1. Run identical scenarios against every provider being compared.
@@ -312,6 +357,9 @@ flowchart LR
   Adapter --> Degraded[Intentionally failing demo]
   Adapter --> Real[Your real provider]
   Adapter --> LiveKit[LiveKit AgentSession]
+  Adapter --> ElevenLabs[ElevenLabs Conversational AI]
+  Adapter --> Vapi[Vapi assistant/chat]
+  Adapter --> Pipecat[Pipecat PipelineTask]
   Adapter --> Plugin[Installed adapter plugin]
   Adapter --> Audio[audio.synth_speech per turn]
   Cascade --> Grade[Per-turn grading]
