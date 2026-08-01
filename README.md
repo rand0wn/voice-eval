@@ -172,6 +172,7 @@ src/voice_agent_eval_lab/
   audio.py        # deterministic WAV synthesis — swap for a real TTS call
   adapters.py     # adapter contract, built-ins, registration, and plugin discovery
   livekit_adapter.py # LiveKit AgentSession event collector + evaluation adapter
+  elevenlabs_adapter.py # ElevenLabs Conversational AI WebSocket event collector + evaluation adapter
   vapi_adapter.py # Vapi assistant/chat client + evaluation adapter
   pipecat_adapter.py # Pipecat PipelineTask client protocol + evaluation adapter
   grading.py      # per-turn rule grading + aggregate scoring
@@ -246,6 +247,21 @@ owns, then expose a small turn-client factory through
 tools, end-to-end latency, available LLM/TTS component timings, and session
 metadata. It intentionally does not claim audio export or interruption
 simulation. See the [LiveKit adapter guide](docs/livekit.md).
+
+### Connect ElevenLabs Conversational AI
+
+Install the optional integration dependency:
+
+```bash
+python -m pip install -e ".[dev,elevenlabs]"
+```
+
+Set `ELEVENLABS_API_KEY` and `ELEVENLABS_AGENT_ID` for an existing
+Conversational AI agent, or inject your own client via
+`VOICE_EVAL_ELEVENLABS_CLIENT`. The adapter drives the agent's WebSocket API,
+recording transcripts, client tool calls, and — when the session streams
+`audio` events — the agent's real synthesized audio. See the
+[ElevenLabs adapter guide](docs/elevenlabs.md).
 
 ### Connect Vapi
 
@@ -324,6 +340,7 @@ flowchart LR
   Adapter --> Degraded[Intentionally failing demo]
   Adapter --> Real[Your real provider]
   Adapter --> LiveKit[LiveKit AgentSession]
+  Adapter --> ElevenLabs[ElevenLabs Conversational AI]
   Adapter --> Vapi[Vapi assistant/chat]
   Adapter --> Pipecat[Pipecat PipelineTask]
   Adapter --> Plugin[Installed adapter plugin]
