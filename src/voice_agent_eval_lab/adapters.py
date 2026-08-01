@@ -19,6 +19,10 @@ class VoicePipelineAdapter(ABC):
     """
 
     name: str
+    #: True for adapters driven by synthesized user audio (see `s2s.py`)
+    #: instead of text turns. The runner/CLI use this flag to validate
+    #: `--audio-mode s2s` without branching on adapter type.
+    supports_s2s: bool = False
 
     @abstractmethod
     def execute(self, scenario: Scenario, audio_dir: Path | None = None) -> list[TurnResult]:
@@ -176,6 +180,15 @@ def _livekit_factory() -> VoicePipelineAdapter:
 
 
 register_adapter("livekit", _livekit_factory)
+
+
+def _mock_s2s_factory() -> VoicePipelineAdapter:
+    from .s2s import MockS2SAdapter
+
+    return MockS2SAdapter()
+
+
+register_adapter("mock-s2s", _mock_s2s_factory)
 
 
 def _elevenlabs_factory() -> VoicePipelineAdapter:

@@ -27,6 +27,7 @@ class Scenario(BaseModel):
     max_latency_ms: float = 1000
     max_questions_per_turn: int = 1
     max_sentences_per_turn: int = 3
+    max_time_to_first_audio_byte_ms: float | None = None
 
 
 class ToolCall(BaseModel):
@@ -42,6 +43,7 @@ class TurnResult(BaseModel):
     user_audio_path: str | None = None
     assistant_audio_path: str | None = None
     assistant_audio_ms: float | None = None
+    time_to_first_audio_byte_ms: float | None = None
     component_timings_ms: dict[str, float] = Field(default_factory=dict)
     session_metadata: dict[str, Any] = Field(default_factory=dict)
 
