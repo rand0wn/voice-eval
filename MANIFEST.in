@@ -1,0 +1,5 @@
+include CONTRIBUTING.md
+recursive-include docs *.md *.cast
+recursive-include examples *.md
+recursive-include scenarios *.yaml
+recursive-include scripts *.sh

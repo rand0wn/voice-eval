@@ -30,11 +30,21 @@ jobs:
       - name: Compile
         run: python -m compileall -q src tests
       - name: CLI smoke test
-        run: >-
-          voice-eval compare
-          --scenario arjun_cancel
-          --adapters cascade degraded
-          --output /tmp/voice-eval-smoke
+        run: |
+          voice-eval suite \
+            --adapter cascade \
+            --min-score 1 \
+            --min-tool-recall 1 \
+            --max-p95-ms 900 \
+            --output /tmp/voice-eval-suite
+          if voice-eval run \
+            --scenario arjun_cancel \
+            --adapter degraded \
+            --min-score 0.9 \
+            --output /tmp/voice-eval-gate; then
+            echo "degraded adapter unexpectedly passed the CI gate" >&2
+            exit 1
+          fi
 
   wheel:
     name: Installed wheel smoke test
@@ -62,6 +72,12 @@ jobs:
             --adapters cascade degraded \
             --audio \
             --output /tmp/voice-eval-installed
+          /tmp/voice-eval-wheel/bin/voice-eval suite \
+            --adapter cascade \
+            --min-score 1 \
+            --min-tool-recall 1 \
+            --max-p95-ms 900 \
+            --output /tmp/voice-eval-installed-suite
       - name: Validate generated WAV artifacts
         run: |
           /tmp/voice-eval-wheel/bin/python - <<'PY'
