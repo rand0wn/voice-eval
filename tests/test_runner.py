@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from voice_agent_eval_lab.scenarios import list_scenarios
 from voice_agent_eval_lab.runner import (
     compare_evaluation,
@@ -52,3 +54,30 @@ def test_compare_with_degraded_adapter_makes_failure_visible():
     scores = {run.adapter: run.evaluation.overall_score for run in report.runs}
     assert scores["cascade"] == 1.0
     assert scores["degraded"] < 0.60
+
+
+def test_run_evaluation_s2s_mode_writes_audio_and_grades_from_it(tmp_path):
+    report = run_evaluation(
+        "basic_booking", "mock-s2s", audio_root=tmp_path / "audio", audio_mode="s2s"
+    )
+    assert report.audio_dir is not None
+    for turn in report.turns:
+        assert Path(turn.user_audio_path).is_file()
+        assert Path(turn.assistant_audio_path).is_file()
+        assert turn.time_to_first_audio_byte_ms is not None
+    assert report.evaluation.overall_score == 1.0
+
+
+def test_run_evaluation_s2s_mode_requires_s2s_capable_adapter(tmp_path):
+    with pytest.raises(ValueError, match="does not support --audio-mode s2s"):
+        run_evaluation("basic_booking", "cascade", audio_root=tmp_path / "audio", audio_mode="s2s")
+
+
+def test_run_evaluation_s2s_mode_requires_audio_root():
+    with pytest.raises(ValueError, match="requires audio synthesis"):
+        run_evaluation("basic_booking", "mock-s2s", audio_mode="s2s")
+
+
+def test_run_evaluation_rejects_unknown_audio_mode(tmp_path):
+    with pytest.raises(ValueError, match="Unknown audio_mode"):
+        run_evaluation("basic_booking", "cascade", audio_root=tmp_path / "audio", audio_mode="bogus")

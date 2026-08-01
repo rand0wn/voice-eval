@@ -16,10 +16,27 @@ def _run_scenario(
     scenario: Scenario,
     adapter_name: str,
     audio_root: Path | None = None,
+    audio_mode: str = "text",
 ) -> RunReport:
+    if audio_mode not in ("text", "s2s"):
+        raise ValueError(f"Unknown audio_mode {audio_mode!r}; expected 'text' or 's2s'")
+
     run_id = uuid4().hex
     audio_dir = (audio_root / run_id) if audio_root is not None else None
-    results = get_adapter(adapter_name).execute(scenario, audio_dir)
+    adapter = get_adapter(adapter_name)
+    if audio_mode == "s2s":
+        if not getattr(adapter, "supports_s2s", False):
+            raise ValueError(
+                f"Adapter '{adapter_name}' does not support --audio-mode s2s. It only "
+                "implements text-driven execute(); pick an adapter built on "
+                "s2s.S2SPipelineAdapter (e.g. 'mock-s2s')."
+            )
+        if audio_dir is None:
+            raise ValueError(
+                "--audio-mode s2s requires audio synthesis; pass an audio_root "
+                "(the CLI does this automatically with --audio-mode s2s)."
+            )
+    results = adapter.execute(scenario, audio_dir)
     return RunReport(
         id=run_id,
         scenario_id=scenario.id,
@@ -34,6 +51,7 @@ def run_evaluation(
     scenario_name: str,
     adapter_name: str,
     audio_root: Path | None = None,
+    audio_mode: str = "text",
 ) -> RunReport:
     """Simulate one scenario through one pipeline adapter.
 
@@ -41,14 +59,19 @@ def run_evaluation(
     written under `audio_root/<run_id>/` — a real, playable artifact, not
     just a text transcript, so a reviewer can spot-check what a turn
     "sounded like" without wiring up a live call.
+
+    `audio_mode="s2s"` drives the scenario with synthesized user audio
+    instead of raw text and grades the pipeline's returned audio directly
+    (see `s2s.py`); it requires both an S2S-capable adapter and `audio_root`.
     """
-    return _run_scenario(load_scenario(scenario_name), adapter_name, audio_root)
+    return _run_scenario(load_scenario(scenario_name), adapter_name, audio_root, audio_mode)
 
 
 def run_suite(
     adapter_name: str,
     scenario_directory: Path | None = None,
     audio_root: Path | None = None,
+    audio_mode: str = "text",
 ) -> SuiteReport:
     """Run all YAML scenarios in deterministic filename order.
 
@@ -76,7 +99,9 @@ def run_suite(
         ids.add(scenario.id)
         scenarios.append(scenario)
 
-    runs = [_run_scenario(scenario, adapter_name, audio_root) for scenario in scenarios]
+    runs = [
+        _run_scenario(scenario, adapter_name, audio_root, audio_mode) for scenario in scenarios
+    ]
     count = len(runs)
     return SuiteReport(
         id=uuid4().hex,
@@ -94,6 +119,7 @@ def compare_evaluation(
     scenario_name: str,
     adapter_names: list[str],
     audio_root: Path | None = None,
+    audio_mode: str = "text",
 ) -> CompareReport:
     """Run the same scenario through every adapter and return all reports.
 
@@ -103,7 +129,9 @@ def compare_evaluation(
     expectations, same rubric, graded the same way.
     """
     scenario = load_scenario(scenario_name)
-    runs = [run_evaluation(scenario_name, name, audio_root) for name in adapter_names]
+    runs = [
+        run_evaluation(scenario_name, name, audio_root, audio_mode) for name in adapter_names
+    ]
     return CompareReport(id=uuid4().hex, scenario_id=scenario.id, runs=runs)
 
 

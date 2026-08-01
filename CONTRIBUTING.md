@@ -66,6 +66,18 @@ publish a `voice_agent_eval_lab.adapters` entry point as described in
 `docs/adapter-plugins.md`. Return the shared `TurnResult` model so the existing
 runner and graders remain provider-neutral.
 
+If the pipeline is a native speech-to-speech provider (OpenAI Realtime,
+ElevenLabs Conversational AI, Vapi, Pipecat, or similar) that drives audio in
+and out rather than text, subclass `S2SPipelineAdapter` in
+`src/voice_agent_eval_lab/s2s.py` and implement `run_turn(self,
+user_audio_path: Path) -> S2STurnObservation` instead of `execute` directly —
+the base class handles synthesizing the user turn, timing it, and writing the
+returned audio under `audio_dir`. This makes the adapter usable with
+`--audio-mode s2s` without any runner/CLI changes. See
+[docs/s2s-testing.md](docs/s2s-testing.md) for the full contract, including
+which `S2STurnObservation` fields are optional (e.g. `assistant_transcript`,
+since native S2S pipelines often don't expose one).
+
 If the adapter calls a paid or networked service:
 
 - keep credentials in environment variables;
