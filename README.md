@@ -172,6 +172,7 @@ src/voice_agent_eval_lab/
   audio.py        # deterministic WAV synthesis — swap for a real TTS call
   adapters.py     # adapter contract, built-ins, registration, and plugin discovery
   livekit_adapter.py # LiveKit AgentSession event collector + evaluation adapter
+  vapi_adapter.py # Vapi assistant/chat client + evaluation adapter
   pipecat_adapter.py # Pipecat PipelineTask client protocol + evaluation adapter
   grading.py      # per-turn rule grading + aggregate scoring
   runner.py       # orchestrates: load scenario -> run adapter(s) -> grade -> write reports
@@ -246,6 +247,15 @@ tools, end-to-end latency, available LLM/TTS component timings, and session
 metadata. It intentionally does not claim audio export or interruption
 simulation. See the [LiveKit adapter guide](docs/livekit.md).
 
+### Connect Vapi
+
+No optional dependency is required; the real client uses only the standard
+library. Set `VAPI_API_KEY` and `VAPI_ASSISTANT_ID`, or expose a turn-client
+factory through `VOICE_EVAL_VAPI_CLIENT` if you want to drive Vapi's `/call`
+REST API and websocket/webhook event stream yourself. Missing credentials
+raise a clear error instead of a stack trace. See the
+[Vapi adapter guide](docs/vapi.md).
+
 ### Connect Pipecat
 
 Pipecat is a self-hosted framework rather than a hosted API: your application
@@ -314,6 +324,7 @@ flowchart LR
   Adapter --> Degraded[Intentionally failing demo]
   Adapter --> Real[Your real provider]
   Adapter --> LiveKit[LiveKit AgentSession]
+  Adapter --> Vapi[Vapi assistant/chat]
   Adapter --> Pipecat[Pipecat PipelineTask]
   Adapter --> Plugin[Installed adapter plugin]
   Adapter --> Audio[audio.synth_speech per turn]

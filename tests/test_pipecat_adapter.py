@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import builtins
+import importlib
 
 import pytest
 
@@ -63,14 +63,14 @@ def test_missing_client_has_actionable_error(monkeypatch):
 
 def test_missing_dependency_has_actionable_error(monkeypatch):
     monkeypatch.delenv("VOICE_EVAL_PIPECAT_CLIENT", raising=False)
-    original_import = __import__
+    original_import_module = importlib.import_module
 
     def reject_pipecat(name, *args, **kwargs):
         if name.startswith("pipecat"):
             raise ImportError("not installed")
-        return original_import(name, *args, **kwargs)
+        return original_import_module(name, *args, **kwargs)
 
-    monkeypatch.setattr(builtins, "__import__", reject_pipecat)
+    monkeypatch.setattr(importlib, "import_module", reject_pipecat)
     with pytest.raises(RuntimeError, match=r"\[pipecat\].*VOICE_EVAL_PIPECAT_CLIENT"):
         _load_configured_client()
 
