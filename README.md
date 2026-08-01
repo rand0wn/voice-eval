@@ -172,6 +172,7 @@ src/voice_agent_eval_lab/
   audio.py        # deterministic WAV synthesis — swap for a real TTS call
   adapters.py     # adapter contract, built-ins, registration, and plugin discovery
   livekit_adapter.py # LiveKit AgentSession event collector + evaluation adapter
+  pipecat_adapter.py # Pipecat PipelineTask client protocol + evaluation adapter
   grading.py      # per-turn rule grading + aggregate scoring
   runner.py       # orchestrates: load scenario -> run adapter(s) -> grade -> write reports
   scenarios.py    # YAML loading
@@ -245,6 +246,24 @@ tools, end-to-end latency, available LLM/TTS component timings, and session
 metadata. It intentionally does not claim audio export or interruption
 simulation. See the [LiveKit adapter guide](docs/livekit.md).
 
+### Connect Pipecat
+
+Pipecat is a self-hosted framework rather than a hosted API: your application
+composes its own STT/LLM/TTS services into a `Pipeline`/`PipelineTask`. Wrap
+that pipeline in a small client implementing `PipecatTurnClient.run_turn`,
+then expose a zero-argument factory through `VOICE_EVAL_PIPECAT_CLIENT`. The
+adapter has no required dependency on `pipecat-ai` itself — install it only
+if your own client code needs it:
+
+```bash
+python -m pip install -e ".[dev,pipecat]"
+```
+
+The adapter records final transcripts, executed tools, end-to-end latency,
+available per-processor component timings, and session metadata. It
+intentionally does not claim audio export. See the
+[Pipecat adapter guide](docs/pipecat.md).
+
 For trustworthy comparisons across real providers:
 
 1. Run identical scenarios against every provider being compared.
@@ -295,6 +314,7 @@ flowchart LR
   Adapter --> Degraded[Intentionally failing demo]
   Adapter --> Real[Your real provider]
   Adapter --> LiveKit[LiveKit AgentSession]
+  Adapter --> Pipecat[Pipecat PipelineTask]
   Adapter --> Plugin[Installed adapter plugin]
   Adapter --> Audio[audio.synth_speech per turn]
   Cascade --> Grade[Per-turn grading]
