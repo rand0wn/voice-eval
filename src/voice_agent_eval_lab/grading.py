@@ -9,6 +9,7 @@ specific rule failed, not just a pass/fail blob.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from statistics import mean
 
 from .models import Evaluation, Scenario, Turn, TurnGrade, TurnResult
@@ -21,32 +22,74 @@ def _sentence_count(text: str) -> int:
     return max(1, len(parts))
 
 
+def _s2s_audio_playable(result: TurnResult) -> bool:
+    """A native S2S turn is only gradeable as "responded" if its audio exists.
+
+    A WAV header alone (44 bytes) is not a response; require some sample
+    data past the header before treating the turn as having produced audio.
+    """
+    if not result.assistant_audio_path:
+        return False
+    path = Path(result.assistant_audio_path)
+    return path.is_file() and path.stat().st_size > 44
+
+
 def grade_turn(scenario: Scenario, turn: Turn, result: TurnResult, index: int) -> TurnGrade:
-    """Grade one turn against every rule that applies to it; return the failures."""
+    """Grade one turn against every rule that applies to it; return the failures.
+
+    Text-shape rules (`must_include_phrase`, `max_questions_per_turn`,
+    `max_sentences_per_turn`, `non_empty_transcript`) only make sense when
+    there is transcript text to grade. Native S2S adapters may report no
+    transcript at all (see `s2s.py`); when a turn carries assistant audio but
+    no transcript, those text rules are skipped in favor of the audio-derived
+    rules (`assistant_audio_playable`, `time_to_first_audio_byte_budget`)
+    below, which apply whenever the turn produced (or should have produced)
+    audio, in text mode or S2S mode alike.
+    """
     failed: list[str] = []
+    audio_only = bool(result.assistant_audio_path) and not result.assistant.strip()
 
     actual_tools = {call.name for call in result.tool_calls}
     if turn.expected_tools and not set(turn.expected_tools).issubset(actual_tools):
         failed.append("expected_tools_called")
 
-    for phrase in turn.must_include:
-        if phrase.lower() not in result.assistant.lower():
-            failed.append("must_include_phrase")
-            break
+    if not audio_only:
+        for phrase in turn.must_include:
+            if phrase.lower() not in result.assistant.lower():
+                failed.append("must_include_phrase")
+                break
 
-    if result.assistant.count("?") > scenario.max_questions_per_turn:
-        failed.append("max_questions_per_turn")
+        if result.assistant.count("?") > scenario.max_questions_per_turn:
+            failed.append("max_questions_per_turn")
 
-    if _sentence_count(result.assistant) > scenario.max_sentences_per_turn:
-        failed.append("max_sentences_per_turn")
+        if _sentence_count(result.assistant) > scenario.max_sentences_per_turn:
+            failed.append("max_sentences_per_turn")
+
+        if not result.user.strip() or not result.assistant.strip():
+            failed.append("non_empty_transcript")
 
     if result.latency_ms > scenario.max_latency_ms:
         failed.append("latency_budget")
 
-    if not result.user.strip() or not result.assistant.strip():
-        failed.append("non_empty_transcript")
+    audio_checks = 0
+    if result.assistant_audio_path:
+        audio_checks += 1
+        if not _s2s_audio_playable(result):
+            failed.append("assistant_audio_playable")
+        if (
+            scenario.max_time_to_first_audio_byte_ms is not None
+            and result.time_to_first_audio_byte_ms is not None
+        ):
+            audio_checks += 1
+            if result.time_to_first_audio_byte_ms > scenario.max_time_to_first_audio_byte_ms:
+                failed.append("time_to_first_audio_byte_budget")
 
-    rules_checked = 5 + (1 if turn.expected_tools else 0) + (1 if turn.must_include else 0)
+    if audio_only:
+        rules_checked = 1 + (1 if turn.expected_tools else 0) + audio_checks
+    else:
+        rules_checked = (
+            5 + (1 if turn.expected_tools else 0) + (1 if turn.must_include else 0) + audio_checks
+        )
     score = 1.0 - (len(failed) / rules_checked) if rules_checked else 1.0
     return TurnGrade(index=index, score=round(max(0.0, score), 4), failed_rules=failed)
 

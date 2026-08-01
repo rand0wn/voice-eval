@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from importlib import metadata
 from pathlib import Path
+from typing import Callable
 
 from . import audio
 from .models import Scenario, ToolCall, Turn, TurnResult
@@ -17,6 +19,10 @@ class VoicePipelineAdapter(ABC):
     """
 
     name: str
+    #: True for adapters driven by synthesized user audio (see `s2s.py`)
+    #: instead of text turns. The runner/CLI use this flag to validate
+    #: `--audio-mode s2s` without branching on adapter type.
+    supports_s2s: bool = False
 
     @abstractmethod
     def execute(self, scenario: Scenario, audio_dir: Path | None = None) -> list[TurnResult]:
@@ -106,13 +112,107 @@ class MockDegradedAdapter(_DeterministicAdapter):
         return result
 
 
+AdapterFactory = Callable[[], VoicePipelineAdapter]
+_ADAPTERS: dict[str, AdapterFactory] = {
+    "cascade": MockCascadeAdapter,
+    "realtime": MockRealtimeAdapter,
+    "degraded": MockDegradedAdapter,
+}
+_ENTRY_POINTS_LOADED = False
+
+
+def register_adapter(name: str, factory: AdapterFactory, *, replace: bool = False) -> None:
+    """Register an adapter factory without modifying this package.
+
+    Libraries should normally expose the factory through the
+    ``voice_agent_eval_lab.adapters`` entry-point group. Direct registration is
+    useful for applications and tests.
+    """
+
+    normalized = name.strip().lower()
+    if not normalized:
+        raise ValueError("Adapter name cannot be empty")
+    if normalized in _ADAPTERS and not replace:
+        raise ValueError(f"Adapter {normalized!r} is already registered")
+    if not callable(factory):
+        raise TypeError("Adapter factory must be callable")
+    _ADAPTERS[normalized] = factory
+
+
+def _load_entry_points() -> None:
+    global _ENTRY_POINTS_LOADED
+    if _ENTRY_POINTS_LOADED:
+        return
+    _ENTRY_POINTS_LOADED = True
+    for entry_point in metadata.entry_points(group="voice_agent_eval_lab.adapters"):
+        if entry_point.name.strip().lower() in _ADAPTERS:
+            raise ValueError(
+                f"Adapter entry point {entry_point.name!r} duplicates an existing adapter"
+            )
+        register_adapter(entry_point.name, entry_point.load())
+
+
+def available_adapters() -> tuple[str, ...]:
+    _load_entry_points()
+    return tuple(sorted(_ADAPTERS))
+
+
 def get_adapter(name: str) -> VoicePipelineAdapter:
-    adapters = {
-        "cascade": MockCascadeAdapter,
-        "realtime": MockRealtimeAdapter,
-        "degraded": MockDegradedAdapter,
-    }
+    _load_entry_points()
+    normalized = name.strip().lower()
     try:
-        return adapters[name]()
+        adapter = _ADAPTERS[normalized]()
     except KeyError as exc:
-        raise ValueError(f"Unknown adapter: {name}") from exc
+        choices = ", ".join(available_adapters())
+        raise ValueError(f"Unknown adapter {name!r}. Available adapters: {choices}") from exc
+    if not isinstance(adapter, VoicePipelineAdapter):
+        raise TypeError(
+            f"Adapter factory {normalized!r} returned {type(adapter).__name__}, "
+            "expected VoicePipelineAdapter"
+        )
+    return adapter
+
+
+def _livekit_factory() -> VoicePipelineAdapter:
+    from .livekit_adapter import LiveKitAdapter
+
+    return LiveKitAdapter()
+
+
+register_adapter("livekit", _livekit_factory)
+
+
+def _mock_s2s_factory() -> VoicePipelineAdapter:
+    from .s2s import MockS2SAdapter
+
+    return MockS2SAdapter()
+
+
+register_adapter("mock-s2s", _mock_s2s_factory)
+
+
+def _elevenlabs_factory() -> VoicePipelineAdapter:
+    from .elevenlabs_adapter import ElevenLabsAdapter
+
+    return ElevenLabsAdapter()
+
+
+register_adapter("elevenlabs", _elevenlabs_factory)
+
+
+def _vapi_factory() -> VoicePipelineAdapter:
+    from .vapi_adapter import VapiAdapter
+
+    return VapiAdapter()
+
+
+register_adapter("vapi", _vapi_factory)
+
+
+def _pipecat_factory() -> VoicePipelineAdapter:
+    from .pipecat_adapter import PipecatAdapter
+
+    return PipecatAdapter()
+
+
+register_adapter("pipecat", _pipecat_factory)

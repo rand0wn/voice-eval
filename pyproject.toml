@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "voice-agent-eval-lab"
-version = "0.2.0"
+version = "0.3.0"
 description = "Provider-neutral simulation and grading module for voice AI pipelines: scripted multi-turn conversations, per-turn audio capture, rule-based grading, and cross-pipeline comparison"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,6 +12,9 @@ dependencies = ["fastapi>=0.110", "pydantic>=2", "PyYAML>=6", "uvicorn>=0.29"]
 
 [project.optional-dependencies]
 dev = ["httpx>=0.27", "pytest>=8"]
+livekit = ["livekit-agents>=1.3"]
+elevenlabs = ["websockets>=12"]
+pipecat = ["pipecat-ai>=0.0.50"]
 
 [project.scripts]
 voice-eval = "voice_agent_eval_lab.cli:main"
