@@ -62,6 +62,12 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
 
+Discover the bundled scenarios and adapters before running anything:
+
+```bash
+voice-eval list
+```
+
 Run one scenario through one pipeline:
 
 ```bash
