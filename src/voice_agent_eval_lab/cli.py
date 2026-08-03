@@ -1,9 +1,10 @@
 import argparse
+import json
 import math
 import sys
 from pathlib import Path
 
-from .adapters import available_adapters
+from .adapters import adapter_catalog, available_adapters
 from .models import RunReport
 
 from .runner import (
@@ -17,6 +18,7 @@ from .runner import (
     write_reports,
     write_suite_reports,
 )
+from .scenarios import list_scenarios
 
 
 def _ratio(value: str) -> float:
@@ -121,6 +123,24 @@ def _suite(args: argparse.Namespace) -> None:
     _enforce_gates(report.runs, args)
 
 
+def _list(args: argparse.Namespace) -> None:
+    scenarios = list_scenarios(args.scenarios)
+    adapters = adapter_catalog()
+
+    if args.json:
+        print(json.dumps({"scenarios": scenarios, "adapters": adapters}, indent=2))
+        return
+
+    print("Scenarios:")
+    for name in scenarios:
+        print(f"- {name}")
+    print()
+    print("Adapters:")
+    for entry in adapters:
+        suffix = " (s2s)" if entry["supports_s2s"] else ""
+        print(f"- {entry['name']}{suffix}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Simulate and grade voice pipelines")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -174,6 +194,19 @@ def main() -> None:
     suite_parser.add_argument("--audio-mode", choices=["text", "s2s"], default="text")
     _add_gates(suite_parser)
     suite_parser.set_defaults(func=_suite)
+
+    list_parser = sub.add_parser("list", help="List available scenarios and adapters")
+    list_parser.add_argument(
+        "--scenarios",
+        type=Path,
+        help="directory containing YAML scenarios (defaults to VOICE_EVAL_SCENARIO_DIR or bundled scenarios)",
+    )
+    list_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="print the list as machine-readable JSON",
+    )
+    list_parser.set_defaults(func=_list)
 
     args = parser.parse_args()
     args.func(args)

@@ -118,10 +118,17 @@ _ADAPTERS: dict[str, AdapterFactory] = {
     "realtime": MockRealtimeAdapter,
     "degraded": MockDegradedAdapter,
 }
+_ADAPTER_S2S: dict[str, bool] = {}
 _ENTRY_POINTS_LOADED = False
 
 
-def register_adapter(name: str, factory: AdapterFactory, *, replace: bool = False) -> None:
+def register_adapter(
+    name: str,
+    factory: AdapterFactory,
+    *,
+    replace: bool = False,
+    supports_s2s: bool | None = None,
+) -> None:
     """Register an adapter factory without modifying this package.
 
     Libraries should normally expose the factory through the
@@ -137,6 +144,9 @@ def register_adapter(name: str, factory: AdapterFactory, *, replace: bool = Fals
     if not callable(factory):
         raise TypeError("Adapter factory must be callable")
     _ADAPTERS[normalized] = factory
+    if supports_s2s is None:
+        supports_s2s = bool(getattr(factory, "supports_s2s", False))
+    _ADAPTER_S2S[normalized] = bool(supports_s2s)
 
 
 def _load_entry_points() -> None:
@@ -155,6 +165,20 @@ def _load_entry_points() -> None:
 def available_adapters() -> tuple[str, ...]:
     _load_entry_points()
     return tuple(sorted(_ADAPTERS))
+
+
+def adapter_catalog() -> list[dict[str, bool]]:
+    """Return sorted adapter names and S2S capability without constructing adapters."""
+    _load_entry_points()
+    return [
+        {
+            "name": name,
+            "supports_s2s": _ADAPTER_S2S.get(
+                name, bool(getattr(_ADAPTERS[name], "supports_s2s", False))
+            ),
+        }
+        for name in sorted(_ADAPTERS)
+    ]
 
 
 def get_adapter(name: str) -> VoicePipelineAdapter:
@@ -188,7 +212,7 @@ def _mock_s2s_factory() -> VoicePipelineAdapter:
     return MockS2SAdapter()
 
 
-register_adapter("mock-s2s", _mock_s2s_factory)
+register_adapter("mock-s2s", _mock_s2s_factory, supports_s2s=True)
 
 
 def _elevenlabs_factory() -> VoicePipelineAdapter:
