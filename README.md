@@ -62,6 +62,17 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
 
+On Windows, use PowerShell instead of `source .venv/bin/activate`:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+```
+
+See [docs/windows.md](docs/windows.md) for execution-policy notes and Windows-specific
+troubleshooting.
+
 Run one scenario through one pipeline:
 
 ```bash
