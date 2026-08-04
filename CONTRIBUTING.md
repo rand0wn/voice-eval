@@ -40,6 +40,9 @@ voice-eval compare --scenario arjun_cancel --adapters cascade degraded --audio
 voice-eval suite --adapter cascade --min-score 1 --min-tool-recall 1 --max-p95-ms 900
 ```
 
+On Windows, replace `source .venv/bin/activate` with PowerShell activation — see
+[docs/windows.md](docs/windows.md) for the full sequence and execution-policy guidance.
+
 The comparison should produce JSON and Markdown reports under `reports/`, plus
 valid WAV files under `reports/audio/`. The bundled audio is made from
 deterministic tones, not spoken TTS, so the test remains offline and
