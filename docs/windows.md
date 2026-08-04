@@ -20,16 +20,21 @@ python -m pip install -e ".[dev]"
 ## Execution policy
 
 If activation fails with *"cannot be loaded because running scripts is disabled on
-this system"*, don't change the execution policy machine-wide. Scope it to your user:
+this system"*, don't change the execution policy machine-wide. Scope it to your user
+account instead:
 
 ```powershell
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 ```
 
-Or bypass for a single session with no policy change:
+Or, to allow it for just the current terminal session without changing any saved
+policy, set the scope to `Process` *before* activating (this must be run in the same
+shell you'll keep using, since a policy set on a child process won't affect your
+current one):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\.venv\Scripts\Activate.ps1
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
 ```
 
 ## Run the tests
@@ -44,13 +49,27 @@ pytest -q
 voice-eval run --scenario basic_booking --adapter cascade
 ```
 
-Writes `reports\<run-id>.json` and `reports\<run-id>.md` relative to the current
-directory (override with `$env:VOICE_EVAL_REPORT_DIR`). Add `--audio` to also write
-WAV files under `reports\audio\<run-id>\`.
+This prints a scorecard to the terminal and writes:
+
+- `reports\<run-id>.json` — machine-readable report
+- `reports\<run-id>.md` — human-readable Markdown scorecard
+
+both relative to your current working directory. Use `--output` to write elsewhere:
+
+```powershell
+voice-eval run --scenario basic_booking --adapter cascade --output path\to\reports
+```
+
+(`VOICE_EVAL_REPORT_DIR` only applies to the FastAPI service, not the CLI.)
+
+Add `--audio` to also write per-turn WAV files under
+`reports\audio\<run-id>\t01_user.wav`, `t01_bot.wav`, etc. The bundled audio is
+deterministic synthetic tones, not spoken TTS — see the README for details.
 
 ## Troubleshooting
 
 - `voice-eval` not recognized: venv not activated, or install didn't finish.
 - `python`/`py` not found: reinstall from python.org with "Add to PATH" checked.
-- Long-path errors: `git config --system core.longpaths true`, or clone nearer the
-  drive root (e.g. `C:\dev\voice-eval`).
+- Long-path errors on deeply nested clones: clone closer to the drive root
+(e.g. `C:\dev\voice-eval` instead of a deeply nested folder), which avoids the
+issue without needing a system-wide Git configuration change.
