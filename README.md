@@ -62,7 +62,6 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
 
-
 On Windows, use PowerShell instead of `source .venv/bin/activate`:
 
 ```powershell
@@ -73,7 +72,6 @@ python -m pip install -e ".[dev]"
 
 See [docs/windows.md](docs/windows.md) for execution-policy notes and Windows-specific
 troubleshooting.
-
 
 Run one scenario through one pipeline:
 

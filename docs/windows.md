@@ -6,8 +6,11 @@
 This page covers only what differs from the [Unix quickstart](../README.md#quickstart)
 in the README — same package, same CLI, same test suite.
 
-Requires Python 3.10+ from [python.org](https://www.python.org/downloads/windows/)
-with the Python Launcher (`py`) on `PATH`.
+Requires Python 3.10+. The examples use the Windows Python Launcher (`py`),
+available with installations from
+[python.org](https://www.python.org/downloads/windows/). If your installation
+does not provide the launcher—for example, some Anaconda setups—replace
+`py -3.12` with `python` in the command below.
 
 ## Create and activate a virtual environment
 
@@ -63,7 +66,7 @@ voice-eval run --scenario basic_booking --adapter cascade --output path\to\repor
 (`VOICE_EVAL_REPORT_DIR` only applies to the FastAPI service, not the CLI.)
 
 Add `--audio` to also write per-turn WAV files under
-`reports\audio\<run-id>\t01_user.wav`, `t01_bot.wav`, etc. The bundled audio is
+`reports\audio\<run-id>\t00_user.wav`, `t00_bot.wav`, etc. The bundled audio is
 deterministic synthetic tones, not spoken TTS — see the README for details.
 
 ## Troubleshooting
