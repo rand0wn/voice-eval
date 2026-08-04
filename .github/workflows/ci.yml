@@ -68,7 +68,7 @@ jobs:
         run: python -m compileall -q src tests
       - name: CLI smoke test
         run: voice-eval run --scenario basic_booking --adapter cascade
-        
+
   wheel:
     name: Installed wheel smoke test
     runs-on: ubuntu-latest
