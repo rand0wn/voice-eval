@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,37 @@ version = "0.3.0"
 description = "Provider-neutral simulation and grading module for voice AI pipelines: scripted multi-turn conversations, per-turn audio capture, rule-based grading, and cross-pipeline comparison"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Abhishek Singh Kushwah" }]
+keywords = [
+  "voice-ai",
+  "voice-agents",
+  "agent-evaluation",
+  "llm-evaluation",
+  "regression-testing",
+  "speech-to-speech",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Framework :: FastAPI",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Software Development :: Testing",
+]
 dependencies = ["fastapi>=0.110", "pydantic>=2", "PyYAML>=6", "uvicorn>=0.29"]
+
+[project.urls]
+Homepage = "https://github.com/rand0wn/voice-eval"
+Documentation = "https://github.com/rand0wn/voice-eval#readme"
+Repository = "https://github.com/rand0wn/voice-eval.git"
+Issues = "https://github.com/rand0wn/voice-eval/issues"
 
 [project.optional-dependencies]
 dev = ["httpx>=0.27", "pytest>=8"]
