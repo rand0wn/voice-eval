@@ -56,7 +56,11 @@ adapter, scenario, grading rule, or documentation improvement.
 
 Requires Python 3.10+.
 
+Clone the repository and install the CLI in an isolated environment:
+
 ```bash
+git clone https://github.com/rand0wn/voice-eval.git
+cd voice-eval
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev]"
@@ -72,6 +76,16 @@ python -m pip install -e ".[dev]"
 
 See [docs/windows.md](docs/windows.md) for execution-policy notes and Windows-specific
 troubleshooting.
+
+Want to try it without cloning first? Install directly from GitHub:
+
+```bash
+python -m pip install "voice-agent-eval-lab @ git+https://github.com/rand0wn/voice-eval.git"
+voice-eval run --scenario basic_booking --adapter cascade
+```
+
+The project is being prepared for its first PyPI release. The GitHub install
+above is the current stable public installation path.
 
 Run one scenario through one pipeline:
 
