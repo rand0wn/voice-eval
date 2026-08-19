@@ -3,11 +3,12 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 
+from . import __version__
 from .models import CompareReport, CompareRequest, RunReport, RunRequest
 from .runner import compare_evaluation, run_evaluation, write_compare_reports, write_reports
 from .scenarios import list_scenarios
 
-app = FastAPI(title="Voice Agent Evaluation Lab", version="0.2.0")
+app = FastAPI(title="Voice Agent Evaluation Lab", version=__version__)
 _runs: dict[str, RunReport] = {}
 _compares: dict[str, CompareReport] = {}
 

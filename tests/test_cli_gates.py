@@ -2,12 +2,21 @@ import sys
 
 import pytest
 
+from voice_agent_eval_lab import __version__
 from voice_agent_eval_lab.cli import main
 
 
 def run_cli(monkeypatch, *arguments: str) -> None:
     monkeypatch.setattr(sys, "argv", ["voice-eval", *arguments])
     main()
+
+
+def test_version_flag_matches_package_version(monkeypatch, capsys):
+    with pytest.raises(SystemExit) as error:
+        run_cli(monkeypatch, "--version")
+
+    assert error.value.code == 0
+    assert capsys.readouterr().out.strip() == f"voice-eval {__version__}"
 
 
 def test_run_passes_when_every_gate_is_met(monkeypatch, tmp_path):
