@@ -419,6 +419,43 @@ flowchart LR
   of harness real voice AI teams build once call volume makes manual
   listening impractical.
 
+### Real-world scenarios this pattern has actually caught
+
+These are the concrete situations that motivated this harness on a
+production Hindi-language voice agent — the same shape of problem shows up
+on any voice AI pipeline:
+
+- **A latency optimization that broke tool calls.** Reducing tool-adapter
+  latency (moving DB writes to background tasks) shaved ~500ms off tool
+  turns — but a naive before/after comparison on a single conversation
+  would have missed that one WAIT-mode tool's timeout was now too close to
+  the pipeline's hard function-call deadline. Running the full scripted
+  suite caught the failure immediately as a new `expected_tools_called`
+  failure on one specific turn, not a vague "feels slower sometimes."
+- **Choosing cascade vs. speech-to-speech with real evidence, not a demo.**
+  A native speech-to-speech model looked faster in a quick manual test, but
+  scripted, graded runs across multiple personas showed it silently skipped
+  tool calls on ~30% of turns that required them — a production blocker a
+  single spot-check would never surface. The comparison table made the
+  tradeoff (lower latency vs. broken tool recall) an explicit, numeric
+  decision instead of a gut call.
+- **Regression-testing a prompt or model change before it reaches a live
+  caller.** Every prompt edit, model bump, or context-pruning change gets
+  run through the same scenario suite first; a drop in per-turn grade score
+  (not just "the demo still sounds fine") is the signal to fix it before
+  merging, the same discipline a unit-test suite brings to a bug fix.
+- **Catching response-shape drift across dozens of turns.** Rules like
+  max-questions-per-turn and max-sentences-per-turn exist because an LLM
+  will happily drift into asking two questions at once or writing a
+  paragraph when a live caller needs one short spoken sentence — a defect
+  that's invisible in a text transcript review but immediately audible (and
+  now, immediately gradable) turn by turn.
+- **Validating a new persona/script before a rollout without a live call.**
+  Adding a new customer segment or conversation flow means writing the YAML
+  script once and getting graded, audible output back in seconds — no need
+  to book a real test call, find a Hindi/regional-language speaker, or wait
+  for a QA cycle to find out the agent mishandles that flow.
+
 ## Troubleshooting
 
 - `python` too old: use `python3.11` or `python3.12` when creating the venv.
