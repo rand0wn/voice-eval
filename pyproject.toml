@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "voice-agent-eval-lab"
-version = "0.3.0"
+dynamic = ["version"]
 description = "Provider-neutral simulation and grading module for voice AI pipelines: scripted multi-turn conversations, per-turn audio capture, rule-based grading, and cross-pipeline comparison"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -54,6 +54,9 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 voice_agent_eval_lab = ["scenario_data/*.yaml"]
+
+[tool.setuptools.dynamic]
+version = { attr = "voice_agent_eval_lab.__version__" }
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

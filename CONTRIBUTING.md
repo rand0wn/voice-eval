@@ -124,6 +124,11 @@ python -m pip install --force-reinstall dist/*.whl
 voice-eval run --scenario basic_booking --adapter cascade
 ```
 
+The package version is controlled by `__version__` in
+`src/voice_agent_eval_lab/__init__.py`. Setuptools reads that value when it
+builds package metadata, and the CLI and FastAPI application import it at
+runtime. Update only that definition when preparing a release.
+
 GitHub Actions repeats the supported-version, packaging, CLI, comparison, and
 audio checks on every pull request.
 

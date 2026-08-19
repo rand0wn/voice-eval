@@ -3,6 +3,7 @@ import math
 import sys
 from pathlib import Path
 
+from . import __version__
 from .adapters import available_adapters
 from .models import RunReport
 
@@ -123,6 +124,7 @@ def _suite(args: argparse.Namespace) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Simulate and grade voice pipelines")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
     adapter_choices = available_adapters()
 

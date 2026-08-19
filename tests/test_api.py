@@ -1,6 +1,14 @@
 from fastapi.testclient import TestClient
 
+from voice_agent_eval_lab import __version__
 from voice_agent_eval_lab.api import app
+
+
+def test_openapi_version_matches_package_version():
+    response = TestClient(app).get("/openapi.json")
+
+    assert response.status_code == 200
+    assert response.json()["info"]["version"] == __version__
 
 
 def test_create_and_fetch_run(tmp_path, monkeypatch):
